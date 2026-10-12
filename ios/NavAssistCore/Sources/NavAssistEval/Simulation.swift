@@ -15,6 +15,11 @@ struct WalkerSimulation {
         var headingNoise = 3.0              // degrees
     }
     var params = Params()
+
+    init(rng: SplitMix64) {
+        self.rng = rng
+    }
+
     /// Tracking error that drifts smoothly (AR(1)), like visual-inertial tracking, rather than
     /// jumping independently every frame.
     private var drift = Vec2(0, 0)
@@ -106,9 +111,9 @@ struct PredictorEvaluation {
     func run() throws {
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         var sim = WalkerSimulation(rng: SplitMix64(seed: 7))
-        let logs = (0..<trips).map { sim.trip(participant: "SIM\($0 % 20)") }
-        let train = logs.enumerated().filter { $0.offset % 2 == 0 }.map(\.element)
-        let test = logs.enumerated().filter { $0.offset % 2 == 1 }.map(\.element)
+        let logs: [TripLog] = (0..<trips).map { sim.trip(participant: "SIM\($0 % 20)") }
+        let train: [TripLog] = logs.enumerated().filter { $0.offset % 2 == 0 }.map { $0.element }
+        let test: [TripLog] = logs.enumerated().filter { $0.offset % 2 == 1 }.map { $0.element }
         print("simulated \(logs.count) trips: \(logs.map { $0.count(.earlyTurn) }.reduce(0, +)) early turns, "
               + "\(logs.map { $0.count(.hesitation) }.reduce(0, +)) hesitations")
 
@@ -151,7 +156,7 @@ struct PredictorEvaluation {
                     summary.row([name, smooth, kind.rawValue, threshold, r.events, r.detected, Double(r.detected) / Double(max(r.events, 1)),
                                  r.medianLead ?? Double.nan, r.falseAlarmsPerMin, auc])
                     print(String(format: "%@ (smoothing %.1f) %@ @%.3f: recall %d/%d, lead %.1f s, %.2f false alarms/min, AUC %.3f",
-                                 name, smooth, kind.rawValue, threshold, r.detected, r.events, r.medianLead ?? .nan, r.falseAlarmsPerMin, auc))
+                                 name, smooth, kind.rawValue, threshold, r.detected, r.events, r.medianLead ?? Double.nan, r.falseAlarmsPerMin, auc))
                 }
             }
         }
