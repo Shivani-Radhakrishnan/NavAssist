@@ -56,6 +56,46 @@ Swift, SwiftUI, ARKit (visual-inertial tracking, world maps, LiDAR depth), Core 
 AVSpeechSynthesizer, UIKit haptic feedback, Swift Testing. Prototyped in Python with
 OpenCV and NumPy on the TUM RGB-D dataset.
 
+## Predicting hesitation and early turns
+
+During every guided trip the app records the sensor signals 10 times a second: position,
+height, facing direction, speed, distance to the next corner, offset from the route and the
+angle to the next leg. Two patterns are detected automatically from that log:
+
+- **Hesitation:** stopping for 2 s or more before arriving.
+- **Early turn:** drifting 0.6 m or more toward the next leg before reaching the corner.
+
+A small predictor (two logistic regressions over seven features of the last few seconds:
+speed, slowing down, turning rate, looking side to side, closeness to a corner, rotating
+toward the next leg, sideways drift) estimates the chance of each pattern in the next ~2
+seconds. When it's likely, the app steps in: *"Not yet. Keep straight for 2 meters more."*
+or *"You're on track. Turn right in 3 meters."* The weights start hand-tuned and can be
+retrained on real logs with `analysis/train_predictor.py`.
+
+## Running a user study
+
+The app is set up to measure whether predictive cues reduce navigation errors.
+
+1. **Settings › Research study:** turn on **Study mode** and enter a participant ID (P1, P2…).
+   Cues then alternate on and off between trips, and the starting condition alternates
+   between participants, so each person walks with and without cues.
+2. Have each participant walk the same set of routes (for example 4 routes × 2 conditions).
+   A sighted spotter should walk alongside every trip.
+3. **Export trip logs** (Settings) and AirDrop the CSV to a Mac.
+4. Measure the effect:
+   ```bash
+   python analysis/analyze_trips.py all_trips.csv
+   ```
+   This prints errors per trip with and without cues, the % reduction with a 95% bootstrap
+   confidence interval, and a Wilcoxon signed-rank test if `scipy` is installed.
+5. Optionally retrain the predictor on the real data and evaluate it per participant:
+   ```bash
+   python analysis/train_predictor.py all_trips.csv -o predictor.json
+   ```
+
+Get informed consent from every participant. If the results will be published or used in
+academic work, check with your institution's IRB before collecting data.
+
 ## Repository layout
 
 ```
@@ -64,6 +104,7 @@ ios/
   BlindNav/               App code: ARKit tracking, speech, haptics, screens
   BlindNavCore/           Navigation logic as a Swift package: route graph, A* routing,
                           turn-by-turn guidance, obstacle zones (tested; runs on a Mac)
+analysis/                 Study analysis and predictor training scripts (Python)
 prototype/                The original Python step-by-step prototype (TUM RGB-D dataset)
 ```
 
@@ -73,9 +114,9 @@ prototype/                The original Python step-by-step prototype (TUM RGB-D 
 cd ios/BlindNavCore && swift test
 ```
 
-There are 40 tests (60 checks including each voice phrasing). They cover routing between separately recorded walks, simplifying ARKit
+There are 49 tests (69 checks including each voice phrasing). They cover routing between separately recorded walks, simplifying ARKit
 wobble into clean legs, simulated walks around corners, off-route detection, rate-limited
-corrections, obstacle zones (floor removal, head-height obstacles, the "stop" distance),
+corrections, hesitation and early-turn detection and prediction (with simulated walkers), obstacle zones (floor removal, head-height obstacles, the "stop" distance),
 and making sure warnings don't flicker.
 
 ## Building the app onto your iPhone

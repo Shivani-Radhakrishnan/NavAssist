@@ -32,6 +32,9 @@ final class Navigator {
     @ObservationIgnored private let signs = SignReader()
     @ObservationIgnored private var place: PlaceFile?
     @ObservationIgnored private var guide: Guide?
+    /// Records the current trip's sensor signals and runs the hesitation / early-turn predictor.
+    @ObservationIgnored private var trip: TripRecorder?
+    @ObservationIgnored private let predictor = TripStore.loadPredictor()
     @ObservationIgnored private var announcer = ObstacleAnnouncer()
     @ObservationIgnored private var candidates: [PlaceFile] = []
     @ObservationIgnored private var attemptTimer: Timer?
@@ -126,6 +129,7 @@ final class Navigator {
     }
 
     func stop() {
+        endTrip(.abandoned)
         saveNow()
         UIApplication.shared.isIdleTimerDisabled = false
     }
@@ -184,10 +188,23 @@ final class Navigator {
         let events = g.update(position: p, heading: h, time: t)
         guide = g
         app.handle(events)
+
+        // Sensor signals -> predictor -> a cue if a hesitation or early turn looks likely.
+        // Route directions take priority: no cue on a tick where the guide is speaking.
+        if !g.finished, var tr = trip {
+            let cues = tr.record(NavSample.make(guide: g, position: p, heading: h, height: height, time: t))
+            trip = tr
+            let guideSpoke = events.contains { if case .speak = $0 { return true } else { return false } }
+            if !guideSpoke, !listening { app.handle(cues) }
+        }
+
         if events.contains(.arrived) {
+            trip?.note(.arrived, at: t)
+            endTrip(.arrived)
             guide = nil
             mode = .mapping
         } else if events.contains(.offRoute) {
+            trip?.note(.offRoute, at: t)
             say("Off route. Recalculating.", urgent: true)
             if let dest = g.destinationNodeID.map(graph.node) { plan(to: dest, announceStart: false) }
         }
@@ -288,12 +305,14 @@ final class Navigator {
         guard let start = graph.nearestNode(to: here, height: ar.height, within: 3) else {
             guide = nil
             mode = .mapping
+            endTrip(.abandoned)
             say("You're more than 3 meters from anywhere I've mapped. Walk back toward where you've been.", urgent: true)
             return
         }
         guard let path = graph.shortestPath(from: start, to: dest.id) else {
             guide = nil
             mode = .mapping
+            endTrip(.abandoned)
             say("I haven't mapped a way from here to \(name) yet. Once you've walked there with the app open, I can guide you.", urgent: true)
             return
         }
@@ -305,6 +324,14 @@ final class Navigator {
         }
         var g = Guide(route: route, heights: heights, destinationName: name, settings: app.settings.guidance)
         g.destinationNodeID = dest.id
+        if announceStart || trip == nil {          // a re-plan after going off route stays the same trip
+            endTrip(.abandoned)
+            var tr = TripRecorder(participant: app.settings.participant, destination: name,
+                                  adaptive: app.settings.nextTripIsAdaptive(),
+                                  routeLength: g.remainingDistance(from: here), predictor: predictor)
+            tr.coach.phrasing = app.settings.phrasing
+            trip = tr
+        }
         let events = g.start(position: here, heading: ar.heading, time: CACurrentMediaTime())
         guide = g
         mode = .guiding(name)
@@ -347,6 +374,8 @@ final class Navigator {
 
     private func stopRoute() {
         guard isGuiding else { say("There's no route to stop.", urgent: true); return }
+        trip?.note(.stopped, at: CACurrentMediaTime())
+        endTrip(.stopped)
         guide = nil
         mode = .mapping
         say("Stopped.", urgent: true)
@@ -368,6 +397,14 @@ final class Navigator {
     }
 
     // MARK: - Helpers
+
+    /// Save the current trip's log (if any samples were recorded) and clear it.
+    private func endTrip(_ outcome: TripLog.Outcome) {
+        guard var tr = trip else { return }
+        trip = nil
+        let log = tr.finish(outcome)
+        if log.samples.count >= 10 { app.trips.save(log) }
+    }
 
     private var isGuiding: Bool { if case .guiding = mode { return true } else { return false } }
 

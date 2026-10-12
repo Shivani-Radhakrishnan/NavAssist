@@ -14,11 +14,18 @@ final class AppSettings {
     var obstacleWarnings: Bool { didSet { defaults.set(obstacleWarnings, forKey: "obstacleWarnings") } }
     var warnDistance: Double { didSet { defaults.set(warnDistance, forKey: "warnDistance") } }
     var haptics: Bool { didSet { defaults.set(haptics, forKey: "haptics") } }
+    /// Predictive cues for hesitation and early turns.
+    var adaptiveCues: Bool { didSet { defaults.set(adaptiveCues, forKey: "adaptiveCues") } }
+    /// Study mode: predictive cues alternate on/off between trips, for a fair comparison.
+    var studyMode: Bool { didSet { defaults.set(studyMode, forKey: "studyMode") } }
+    var participant: String { didSet { defaults.set(participant, forKey: "participant") } }
+    var tripCounter: Int { didSet { defaults.set(tripCounter, forKey: "tripCounter") } }
 
     init() {
         defaults.register(defaults: [
             "unit": DistanceUnit.meters.rawValue, "stepLength": 0.7, "speechRate": 0.5,
             "obstacleWarnings": true, "warnDistance": 1.5, "haptics": true,
+            "adaptiveCues": true, "studyMode": false, "participant": "P1",
         ])
         acceptedSafetyNotice = defaults.bool(forKey: "acceptedSafetyNotice")
         unit = DistanceUnit(rawValue: defaults.string(forKey: "unit") ?? "") ?? .meters
@@ -27,6 +34,20 @@ final class AppSettings {
         obstacleWarnings = defaults.bool(forKey: "obstacleWarnings")
         warnDistance = defaults.double(forKey: "warnDistance")
         haptics = defaults.bool(forKey: "haptics")
+        adaptiveCues = defaults.bool(forKey: "adaptiveCues")
+        studyMode = defaults.bool(forKey: "studyMode")
+        participant = defaults.string(forKey: "participant") ?? "P1"
+        tripCounter = defaults.integer(forKey: "tripCounter")
+    }
+
+    /// Whether the next trip gets predictive cues. In study mode trips alternate, and the
+    /// starting condition alternates between participants (P1 starts with cues, P2 without...).
+    func nextTripIsAdaptive() -> Bool {
+        guard studyMode else { return adaptiveCues }
+        let digits = Int(participant.filter(\.isNumber)) ?? 1
+        let adaptive = (tripCounter + digits) % 2 == 1
+        tripCounter += 1
+        return adaptive
     }
 
     var phrasing: Phrasing { Phrasing(unit: unit, stepLength: stepLength) }
@@ -46,6 +67,7 @@ final class AppServices {
     let speaker = Speaker()
     let haptics = Haptics()
     let store = PlaceStore()
+    let trips = TripStore()
     /// Last sentence spoken, shown as a caption for sighted helpers and low-vision users.
     private(set) var caption = ""
 

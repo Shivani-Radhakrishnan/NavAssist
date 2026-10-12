@@ -6,6 +6,9 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var places: [PlaceFile] = []
     @State private var confirmDelete: PlaceFile?
+    @State private var tripCount = 0
+    @State private var exportURL: URL?
+    @State private var confirmDeleteTrips = false
 
     var body: some View {
         @Bindable var s = app.settings
@@ -45,6 +48,31 @@ struct SettingsView: View {
                      : "This iPhone has no LiDAR. Obstacle warnings use a depth model and are less reliable.")
             }
             Section {
+                Toggle("Predictive cues", isOn: $s.adaptiveCues)
+                    .disabled(s.studyMode)
+                Toggle("Study mode", isOn: $s.studyMode)
+                HStack {
+                    Text("Participant")
+                    TextField("P1", text: $s.participant)
+                        .multilineTextAlignment(.trailing)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                }
+                Text("\(tripCount) trips recorded")
+                if let exportURL {
+                    ShareLink(item: exportURL) { Label("Export trip logs (CSV)", systemImage: "square.and.arrow.up") }
+                }
+                if tripCount > 0 {
+                    Button("Delete trip logs", role: .destructive) { confirmDeleteTrips = true }
+                }
+            } header: {
+                Text("Research study")
+            } footer: {
+                Text("Predictive cues watch for hesitation and turning too early, and step in with \"Not yet, keep straight\" or \"You're on track\". "
+                     + "In study mode they switch on and off for alternate trips, so you can compare navigation errors with and without them. "
+                     + "Every guided trip is logged; logs are also in the Files app under On My iPhone › BlindNav › Trips.")
+            }
+            Section {
                 if places.isEmpty { Text("No maps saved yet.") }
                 ForEach(places, id: \.name) { p in
                     VStack(alignment: .leading) {
@@ -66,7 +94,11 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .toolbar { Button("Done") { dismiss() } }
-        .onAppear { places = app.store.list() }
+        .onAppear {
+            places = app.store.list()
+            tripCount = app.trips.count()
+            exportURL = app.trips.combinedCSV()
+        }
         .onDisappear { app.applySettings() }
         .confirmationDialog("Delete \(confirmDelete?.name ?? "")? Everything saved there will be forgotten.",
                             isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
@@ -74,6 +106,14 @@ struct SettingsView: View {
             Button("Delete", role: .destructive) {
                 if let p = confirmDelete { try? app.store.delete(p) }
                 places = app.store.list()
+            }
+        }
+        .confirmationDialog("Delete all \(tripCount) trip logs? Export them first if you need them.",
+                            isPresented: $confirmDeleteTrips, titleVisibility: .visible) {
+            Button("Delete trip logs", role: .destructive) {
+                app.trips.deleteAll()
+                tripCount = 0
+                exportURL = nil
             }
         }
     }

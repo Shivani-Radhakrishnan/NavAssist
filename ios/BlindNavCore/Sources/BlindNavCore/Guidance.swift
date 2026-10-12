@@ -75,7 +75,11 @@ public struct Guide: Sendable {
         return d
     }
 
-    private var isLastLeg: Bool { target >= route.count - 1 }
+    public var isLastLeg: Bool { target >= route.count - 1 }
+
+    /// The turn (degrees, positive = left) the user will make at the point they're walking
+    /// toward; 0 on the last leg.
+    public var upcomingTurn: Double { turn(at: target) }
     private var say: Phrasing { settings.phrasing }
 
     /// Length of the leg that ends at `target`, starting from p.
@@ -227,7 +231,7 @@ public struct Guide: Sendable {
         return cur.t >= 0.95 && next < p.distance(to: cur.point)
     }
 
-    private func distanceToRemainingRoute(_ p: Vec2) -> Double {
+    public func distanceToRemainingRoute(_ p: Vec2) -> Double {
         var best = Double.infinity
         for i in (target - 1)..<(route.count - 1) {
             best = min(best, distanceToSegment(p, route[i], route[i + 1]))
