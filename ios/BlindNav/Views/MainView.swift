@@ -132,7 +132,7 @@ struct SafetyNoticeView: View {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Before you start").font(.largeTitle.bold())
                     .accessibilityAddTraits(.isHeader)
-                Text("BlindNav is an experimental aid. It does not replace a white cane, a guide dog, or orientation and mobility training. Keep using them.")
+                Text("NavAssist is an experimental aid. It does not replace a white cane, a guide dog, or orientation and mobility training. Keep using them.")
                 Text("It maps where you walk, and can only guide you along paths it has already mapped. It can be wrong and can miss obstacles, especially low, thin, glass or moving ones. It warns about stairs only on paths it has mapped before.")
                 Text("Hold the phone upright at chest height, camera facing forward. Tap anywhere on the screen and speak, for example: save this place as kitchen, or take me to kitchen.")
                 Text("Directions use clock positions: 12 o'clock is straight ahead, 3 o'clock is to your right. Two taps means turn left, three taps means turn right.")

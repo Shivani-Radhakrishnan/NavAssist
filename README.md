@@ -1,11 +1,11 @@
-# BlindNav: indoor navigation for blind and low-vision people
+# NavAssist: indoor navigation for blind and low-vision people
 
 [![Tests](https://github.com/Shivani-Radhakrishnan/blind-nav/actions/workflows/tests.yml/badge.svg)](https://github.com/Shivani-Radhakrishnan/blind-nav/actions/workflows/tests.yml)
 
-BlindNav is an iPhone app that gives turn-by-turn spoken and vibration directions inside
+NavAssist is an iPhone app that gives turn-by-turn spoken and vibration directions inside
 buildings, and warns about obstacles in front of the user.
 
-> **Safety:** BlindNav is an experimental aid. It does not replace a white cane, a guide
+> **Safety:** NavAssist is an experimental aid. It does not replace a white cane, a guide
 > dog, or orientation and mobility training. It can miss obstacles (especially low, thin,
 > glass or moving ones), it doesn't detect stairs or drop-offs, and it can lose track.
 
@@ -126,10 +126,10 @@ running iOS 17 or later. The iOS Simulator can show the screens, but it can't tr
 movement, so real testing needs a real phone.
 
 1. Open `ios/BlindNav.xcodeproj` in Xcode.
-2. Select the **BlindNav** target, then **Signing & Capabilities**. Choose your Apple ID
+2. Select the **NavAssist** target, then **Signing & Capabilities**. Choose your Apple ID
    under *Team* (add it in Xcode › Settings › Accounts; a free account works). Change
-   *Bundle Identifier* from `com.shivaniradhakrishnan.BlindNav` to your own if you fork this, such as
-   `com.<yourname>.BlindNav`.
+   *Bundle Identifier* from `com.shivaniradhakrishnan.NavAssist` to your own if you fork this, such as
+   `com.<yourname>.NavAssist`.
 3. Connect the iPhone with a cable. On the iPhone, turn on Settings › Privacy & Security ›
    **Developer Mode**.
 4. Choose your iPhone at the top of the Xcode window and press **Run** (⌘R).
@@ -181,3 +181,5 @@ cd prototype && ../venv/bin/python step8.py
 
 The datasets (`rgbd_dataset_freiburg1_*`, about 1.2 GB) aren't committed. Download them from
 the TUM RGB-D benchmark website.
+
+_The Xcode project and Swift package keep their original internal names (`BlindNav`, `BlindNavCore`)._

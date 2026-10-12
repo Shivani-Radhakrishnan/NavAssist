@@ -70,7 +70,7 @@ struct SettingsView: View {
             } footer: {
                 Text("Predictive cues watch for hesitation and turning too early, and step in with \"Not yet, keep straight\" or \"You're on track\". "
                      + "In study mode they switch on and off for alternate trips, so you can compare navigation errors with and without them. "
-                     + "Every guided trip is logged; logs are also in the Files app under On My iPhone › BlindNav › Trips.")
+                     + "Every guided trip is logged; logs are also in the Files app under On My iPhone › NavAssist › Trips.")
             }
             Section {
                 if places.isEmpty { Text("No maps saved yet.") }
@@ -86,7 +86,7 @@ struct SettingsView: View {
             } header: {
                 Text("Saved maps")
             } footer: {
-                Text("Maps are made automatically as you walk. Swipe left on one to delete it. Changes apply the next time BlindNav opens.")
+                Text("Maps are made automatically as you walk. Swipe left on one to delete it. Changes apply the next time NavAssist opens.")
             }
             Section("About") {
                 Button("Show the safety notice again") { s.acceptedSafetyNotice = false }

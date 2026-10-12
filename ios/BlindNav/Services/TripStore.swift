@@ -1,7 +1,7 @@
 import BlindNavCore
 import Foundation
 
-/// Saves trip logs to Documents/Trips (visible in the Files app under "On My iPhone › BlindNav").
+/// Saves trip logs to Documents/Trips (visible in the Files app under "On My iPhone › NavAssist").
 struct TripStore {
     let root: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]

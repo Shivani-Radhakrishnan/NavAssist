@@ -55,7 +55,7 @@
 /* Begin PBXNativeTarget section */
 		B1A0D0000000000000000006 /* BlindNav */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B1A0D000000000000000000E /* Build configuration list for PBXNativeTarget "BlindNav" */;
+			buildConfigurationList = B1A0D000000000000000000E /* Build configuration list for PBXNativeTarget "NavAssist" */;
 			buildPhases = (
 				B1A0D0000000000000000007 /* Sources */,
 				B1A0D0000000000000000003 /* Frameworks */,
@@ -91,7 +91,7 @@
 					};
 				};
 			};
-			buildConfigurationList = B1A0D000000000000000000D /* Build configuration list for PBXProject "BlindNav" */;
+			buildConfigurationList = B1A0D000000000000000000D /* Build configuration list for PBXProject "NavAssist" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -186,10 +186,10 @@
 				DEVELOPMENT_TEAM = 3438Q3HF53;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = BlindNav;
-				INFOPLIST_KEY_NSCameraUsageDescription = "BlindNav uses the camera to map where you walk, read signs, and warn you about obstacles in front of you.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BlindNav listens for your voice commands, such as save this place or take me to the kitchen, after you tap the screen.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "BlindNav turns your voice commands into text so it can act on them. This happens on your iPhone when possible.";
+				INFOPLIST_KEY_CFBundleDisplayName = NavAssist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "NavAssist uses the camera to map where you walk, read signs, and warn you about obstacles in front of you.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "NavAssist listens for your voice commands, such as save this place or take me to the kitchen, after you tap the screen.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "NavAssist turns your voice commands into text so it can act on them. This happens on your iPhone when possible.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
@@ -218,10 +218,10 @@
 				DEVELOPMENT_TEAM = 3438Q3HF53;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = BlindNav;
-				INFOPLIST_KEY_NSCameraUsageDescription = "BlindNav uses the camera to map where you walk, read signs, and warn you about obstacles in front of you.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BlindNav listens for your voice commands, such as save this place or take me to the kitchen, after you tap the screen.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "BlindNav turns your voice commands into text so it can act on them. This happens on your iPhone when possible.";
+				INFOPLIST_KEY_CFBundleDisplayName = NavAssist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "NavAssist uses the camera to map where you walk, read signs, and warn you about obstacles in front of you.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "NavAssist listens for your voice commands, such as save this place or take me to the kitchen, after you tap the screen.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "NavAssist turns your voice commands into text so it can act on them. This happens on your iPhone when possible.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
@@ -245,7 +245,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		B1A0D000000000000000000D /* Build configuration list for PBXProject "BlindNav" */ = {
+		B1A0D000000000000000000D /* Build configuration list for PBXProject "NavAssist" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B1A0D000000000000000000F /* Debug */,
@@ -254,7 +254,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B1A0D000000000000000000E /* Build configuration list for PBXNativeTarget "BlindNav" */ = {
+		B1A0D000000000000000000E /* Build configuration list for PBXNativeTarget "NavAssist" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B1A0D0000000000000000011 /* Debug */,

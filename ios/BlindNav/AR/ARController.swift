@@ -140,7 +140,7 @@ final class ARController: NSObject, ARSessionDelegate {
 
     func session(_ session: ARSession, didFailWithError error: Error) {
         if (error as? ARError)?.code == .cameraUnauthorized {
-            setTracking(.limited("BlindNav can't use the camera. Allow camera access in the Settings app, under BlindNav."))
+            setTracking(.limited("NavAssist can't use the camera. Allow camera access in the Settings app, under NavAssist."))
         } else {
             setTracking(.limited("The camera stopped working: \(error.localizedDescription)"))
         }

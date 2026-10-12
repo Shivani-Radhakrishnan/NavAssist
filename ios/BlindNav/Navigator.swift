@@ -77,7 +77,7 @@ final class Navigator {
 
         voice.requestPermission { [weak self] ok in
             if !ok {
-                self?.say("To use voice commands, allow the microphone and speech recognition for BlindNav in the Settings app.", urgent: false)
+                self?.say("To use voice commands, allow the microphone and speech recognition for NavAssist in the Settings app.", urgent: false)
             }
         }
     }
@@ -245,7 +245,7 @@ final class Navigator {
             case .success(let text): self.handle(text)
             case .failure(.notAllowed):
                 self.say("I need permission to use the microphone and speech recognition. "
-                         + "Open the Settings app, find BlindNav, and allow both.", urgent: true)
+                         + "Open the Settings app, find NavAssist, and allow both.", urgent: true)
             case .failure(.unavailable):
                 self.say("Speech recognition isn't available right now. Check the internet connection and try again.", urgent: true)
             }
