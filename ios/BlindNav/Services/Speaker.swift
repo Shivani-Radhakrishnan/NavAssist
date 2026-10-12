@@ -4,7 +4,8 @@ import UIKit
 /// Speaks guidance. Urgent messages (turns, "Stop") cut in immediately; others wait
 /// for the current sentence, and only the newest waiting one is kept so the app never
 /// falls behind reading out stale directions.
-final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
+// Only used from the main thread; delegate callbacks hop back to main before touching state.
+final class Speaker: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
     private let synth = AVSpeechSynthesizer()
     private var pending: String?
     var rate: Float = AVSpeechUtteranceDefaultSpeechRate
