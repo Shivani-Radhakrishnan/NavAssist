@@ -1,4 +1,4 @@
-"""Step 10: off-route detection.
+"""Off-route detection.
 Push the walker off the green line with the a / d keys. The system notices,
 says "Off route. Recalculating.", and plans a new route from where it is."""
 import time
@@ -6,9 +6,9 @@ import time
 import cv2
 import numpy as np
 
-from step8 import (CELL, SIZE, S, astar, base_view, nearest_walkable,
+from route_planner import (CELL, SIZE, S, astar, base_view, nearest_walkable,
                    smooth, to_screen, walkable)
-from step9 import SPEED, Speaker, plan_steps
+from simulated_walker import SPEED, Speaker, plan_steps
 
 OFF_ROUTE_M = 0.35     # farther than this from the green line counts as off route
 OFF_ROUTE_S = 0.3      # ...if it lasts at least this many seconds

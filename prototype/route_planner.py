@@ -2,7 +2,7 @@ import heapq
 import cv2
 import numpy as np
 
-# ---------- Load the map made in step 7 ----------
+# ---------- Load the map made by occupancy_grid.py ----------
 logodds = np.load("map.npy")
 SIZE = logodds.shape[0]
 CELL = 0.05                       # each cell is 5 cm

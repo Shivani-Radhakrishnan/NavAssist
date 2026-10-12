@@ -1,10 +1,10 @@
-"""Step 11: obstacle warnings from the iPhone camera (Continuity Camera).
+"""Obstacle warnings from the iPhone camera (Continuity Camera).
 Depth Anything V2 Small estimates relative depth. The floor at the bottom of
 the picture is used as a ruler: anything in the left / center / right zones
 that looks much closer than that floor triggers a spoken warning.
 
-    python step11.py --list      # show which camera numbers work
-    python step11.py --cam 1     # run with camera 1
+    python live_obstacle_warnings.py --list      # show which camera numbers work
+    python live_obstacle_warnings.py --cam 1     # run with camera 1
 """
 import argparse
 import shutil
@@ -175,7 +175,7 @@ def draw(frame, depth, scores, blocked, warn_at, floor_ref):
 def run(cam_index):
     cap = open_cam(cam_index)
     if cap is None:
-        print(f"Camera {cam_index} did not open. Try: python step11.py --list")
+        print(f"Camera {cam_index} did not open. Try: python live_obstacle_warnings.py --list")
         return
     model, device = load_model()
     speaker = Speaker()

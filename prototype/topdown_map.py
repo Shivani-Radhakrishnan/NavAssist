@@ -1,7 +1,10 @@
+import sys
+
 import cv2
 import numpy as np
 
-folder = "rgbd_dataset_freiburg1_xyz"
+# Which TUM sequence to map: python topdown_map.py [rgbd_dataset_freiburg1_xyz]
+folder = sys.argv[1] if len(sys.argv) > 1 else "rgbd_dataset_freiburg1_room"
 
 # Camera lens numbers for the TUM freiburg1 camera
 FX, FY, CX, CY = 517.3, 516.5, 318.6, 255.3

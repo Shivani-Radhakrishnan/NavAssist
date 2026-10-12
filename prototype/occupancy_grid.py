@@ -57,7 +57,7 @@ def world_points(t):
     return pts_cam @ R.T + np.array([tx, ty, tz]), (tx, ty, tz)
 
 # ---------- Settings ----------
-floor_z = 0.04          # measured in step 6
+floor_z = 0.04          # measured with height_filtered_map.py
 LOW = floor_z + 0.20    # ignore the floor itself
 HIGH = floor_z + 1.90   # ignore the ceiling
 

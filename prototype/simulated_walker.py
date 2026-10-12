@@ -1,4 +1,4 @@
-"""Step 9: a virtual user walks the planned route and speaks each instruction."""
+"""A virtual user walks the planned route and speaks each instruction."""
 import shutil
 import subprocess
 import time
@@ -6,7 +6,7 @@ import time
 import cv2
 import numpy as np
 
-from step8 import (CELL, SIZE, S, astar, base_view, nearest_walkable,
+from route_planner import (CELL, SIZE, S, astar, base_view, nearest_walkable,
                    simplify, smooth, to_screen, walkable, wrap)
 
 SPEED = 0.5                  # walking speed in meters per second
@@ -24,7 +24,7 @@ def turn_words(turn):
 
 
 def plan_steps(waypoints):
-    """Same rules as describe() in step 8, but each instruction also
+    """Same rules as describe() in route_planner.py, but each instruction also
     remembers the points it covers, so the walker knows where to go."""
     pts = simplify(waypoints)
     groups = []
