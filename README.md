@@ -119,3 +119,8 @@ obstacle warnings. See [prototype/README.md](prototype/README.md).
 
 Swift, SwiftUI, ARKit, Core ML (Depth Anything V2), Vision, Speech, AVFoundation, and Swift
 Testing. The prototype and analysis use Python with OpenCV, NumPy, PyTorch and Transformers.
+
+## License
+
+[MIT](LICENSE). The Depth Anything V2 Core ML model is not included; it is distributed by
+Apple under the Apache 2.0 license. The TUM RGB-D dataset is not included; see its own terms.
