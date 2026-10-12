@@ -1,5 +1,7 @@
 # BlindNav: indoor navigation for blind and low-vision people
 
+[![Tests](https://github.com/Shivani-Radhakrishnan/blind-nav/actions/workflows/tests.yml/badge.svg)](https://github.com/Shivani-Radhakrishnan/blind-nav/actions/workflows/tests.yml)
+
 BlindNav is an iPhone app that gives turn-by-turn spoken and vibration directions inside
 buildings, and warns about obstacles in front of the user.
 
@@ -40,6 +42,19 @@ With VoiceOver on, double-tap the screen or use the two-finger double-tap (magic
     the model file; see [Adding the depth model](#adding-the-depth-model).
 
 Settings (the gear) holds distance units, voice speed, vibrations, and the list of saved maps.
+
+## Status
+
+This is a working prototype that runs on a real iPhone. The navigation logic is covered by
+automated tests (below), but the app has **not yet been evaluated with blind users**, and
+obstacle detection on non-LiDAR phones is an estimate. Treat it as a research prototype.
+
+## Built with
+
+Swift, SwiftUI, ARKit (visual-inertial tracking, world maps, LiDAR depth), Core ML
+(Depth Anything V2), Vision (on-device text recognition), Speech (on-device recognition),
+AVSpeechSynthesizer, UIKit haptic feedback, Swift Testing. Prototyped in Python with
+OpenCV and NumPy on the TUM RGB-D dataset.
 
 ## Repository layout
 
