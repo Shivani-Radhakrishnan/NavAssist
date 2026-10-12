@@ -13,3 +13,16 @@ jobs:
       - name: Run tests
         working-directory: ios/NavAssistCore
         run: swift test
+
+  android-core:
+    name: Android core tests (Kotlin)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Run tests
+        working-directory: android
+        run: ./gradlew :core:test --console=plain

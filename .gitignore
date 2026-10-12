@@ -25,3 +25,9 @@ ios/NavAssist.xcodeproj/project.xcworkspace/
 
 # Local tooling
 .claude/
+
+# Android / Gradle
+android/.gradle/
+android/**/build/
+android/local.properties
+.kotlin/

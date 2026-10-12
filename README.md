@@ -1,6 +1,6 @@
 # NavAssist
 
-**Voice-first indoor navigation for blind and low-vision people, on iPhone and iPad.**
+**Voice-first indoor navigation for blind and low-vision people. iPhone and iPad, with an Android port in progress.**
 
 [![Tests](https://github.com/Shivani-Radhakrishnan/NavAssist/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Shivani-Radhakrishnan/NavAssist/actions/workflows/tests.yml)
 
@@ -44,6 +44,8 @@ ios/
     Views/                  main screen, settings, camera preview
   NavAssistCore/            Swift package: navigation logic and its tests
     Sources/NavAssistEval/  offline benchmark (TUM RGB-D + simulated walkers)
+android/
+  core/                     the same navigation logic in Kotlin, with ported tests (no Android SDK needed)
 analysis/                   user-study analysis, predictor training, figure generation (Python)
 results/                    raw benchmark outputs behind every number in the report
 docs/                       technical report, setup, evaluation and research-study guides
@@ -52,10 +54,11 @@ prototype/                  the original Python prototype on the TUM RGB-D datas
 
 ## Getting started
 
-Run the tests (any Mac with Swift 5.10 or later):
+Run the tests (Swift on a Mac; Kotlin on any machine with Java 21):
 
 ```bash
-cd ios/NavAssistCore && swift test
+cd ios/NavAssistCore && swift test      # 59 tests
+cd android && ./gradlew :core:test      # 57 tests, Kotlin port
 ```
 
 To run the app on an iPhone, see **[docs/setup.md](docs/setup.md)**. You need Xcode 16 or
@@ -92,7 +95,7 @@ relative-depth method. That method was what flagged a basket beside the path as 
 (AUC 0.83, about 2 s lead), but at ≤ 1 false alarm per minute it catches only 13% of them.
 That is why the next step is training on real trip logs.
 
-**Tests.** 59 automated tests (79 checks) run on every push. See [docs/evaluation.md](docs/evaluation.md).
+**Tests.** 59 Swift tests and 57 Kotlin tests run on every push. See [docs/evaluation.md](docs/evaluation.md).
 
 ## Research study tools
 
@@ -102,8 +105,9 @@ the predictor. See **[docs/research-study.md](docs/research-study.md)**.
 
 ## Status and limitations
 
-NavAssist runs on iPhone and iPad (portrait). An Android version would need a separate app
-built on ARCore; the navigation logic in `NavAssistCore` is platform-independent and could be ported.
+NavAssist runs on iPhone and iPad (portrait). For Android, the navigation logic is already
+ported to Kotlin (`android/core`, 57 tests). The ARCore app layer is planned, and
+[docs/android.md](docs/android.md) has the plan and how each feature maps to Android.
 
 - Routes exist only where someone has walked with the app open.
 - Recognizing a place needs it to look roughly as it did when mapped. Big lighting or
