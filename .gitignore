@@ -12,8 +12,13 @@ prototype/map.npy
 DerivedData/
 xcuserdata/
 *.xcuserstate
-ios/BlindNav.xcodeproj/project.xcworkspace/
+ios/NavAssist.xcodeproj/project.xcworkspace/
 
 # Depth model for non-LiDAR iPhones (about 50 MB, downloaded separately)
 *.mlpackage/
 *.mlmodel
+
+# Editors
+.vscode/
+.idea/
+*.pyc

@@ -1,5 +1,5 @@
 import ARKit
-import BlindNavCore
+import NavAssistCore
 import Vision
 
 /// Reads signs ("Room 204", "Exit", "Toilets") from the camera with Apple's on-device
@@ -8,7 +8,7 @@ final class SignReader {
     /// Sign texts found in one frame, and the frame's time.
     var onSigns: (([String], TimeInterval) -> Void)?
 
-    private let queue = DispatchQueue(label: "blindnav.signs", qos: .utility)
+    private let queue = DispatchQueue(label: "navassist.signs", qos: .utility)
     private var busy = false
     private var last: TimeInterval = 0
 

@@ -7,17 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B1A0D000000000000000000A /* BlindNavCore in Frameworks */ = {isa = PBXBuildFile; productRef = B1A0D000000000000000000B /* BlindNavCore */; };
+		B1A0D000000000000000000A /* NavAssistCore in Frameworks */ = {isa = PBXBuildFile; productRef = B1A0D000000000000000000B /* NavAssistCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		B1A0D0000000000000000001 /* BlindNav.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BlindNav.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1A0D0000000000000000001 /* NavAssist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NavAssist.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		B1A0D0000000000000000002 /* BlindNav */ = {
+		B1A0D0000000000000000002 /* NavAssist */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = BlindNav;
+			path = NavAssist;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -27,7 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B1A0D000000000000000000A /* BlindNavCore in Frameworks */,
+				B1A0D000000000000000000A /* NavAssistCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -37,7 +37,7 @@
 		B1A0D0000000000000000004 = {
 			isa = PBXGroup;
 			children = (
-				B1A0D0000000000000000002 /* BlindNav */,
+				B1A0D0000000000000000002 /* NavAssist */,
 				B1A0D0000000000000000005 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -45,7 +45,7 @@
 		B1A0D0000000000000000005 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				B1A0D0000000000000000001 /* BlindNav.app */,
+				B1A0D0000000000000000001 /* NavAssist.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -53,7 +53,7 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		B1A0D0000000000000000006 /* BlindNav */ = {
+		B1A0D0000000000000000006 /* NavAssist */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B1A0D000000000000000000E /* Build configuration list for PBXNativeTarget "NavAssist" */;
 			buildPhases = (
@@ -66,14 +66,14 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				B1A0D0000000000000000002 /* BlindNav */,
+				B1A0D0000000000000000002 /* NavAssist */,
 			);
-			name = BlindNav;
+			name = NavAssist;
 			packageProductDependencies = (
-				B1A0D000000000000000000B /* BlindNavCore */,
+				B1A0D000000000000000000B /* NavAssistCore */,
 			);
-			productName = BlindNav;
-			productReference = B1A0D0000000000000000001 /* BlindNav.app */;
+			productName = NavAssist;
+			productReference = B1A0D0000000000000000001 /* NavAssist.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -101,14 +101,14 @@
 			mainGroup = B1A0D0000000000000000004;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				B1A0D000000000000000000C /* XCLocalSwiftPackageReference "BlindNavCore" */,
+				B1A0D000000000000000000C /* XCLocalSwiftPackageReference "NavAssistCore" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B1A0D0000000000000000005 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				B1A0D0000000000000000006 /* BlindNav */,
+				B1A0D0000000000000000006 /* NavAssist */,
 			);
 		};
 /* End PBXProject section */
@@ -266,17 +266,17 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		B1A0D000000000000000000C /* XCLocalSwiftPackageReference "BlindNavCore" */ = {
+		B1A0D000000000000000000C /* XCLocalSwiftPackageReference "NavAssistCore" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = BlindNavCore;
+			relativePath = NavAssistCore;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		B1A0D000000000000000000B /* BlindNavCore */ = {
+		B1A0D000000000000000000B /* NavAssistCore */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = B1A0D000000000000000000C /* XCLocalSwiftPackageReference "BlindNavCore" */;
-			productName = BlindNavCore;
+			package = B1A0D000000000000000000C /* XCLocalSwiftPackageReference "NavAssistCore" */;
+			productName = NavAssistCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

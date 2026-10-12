@@ -1,5 +1,5 @@
 import ARKit
-import BlindNavCore
+import NavAssistCore
 import CoreML
 import Vision
 
@@ -116,7 +116,7 @@ final class LiDARObstacleSource: ObstacleSource {
     var analyzer = MetricZoneAnalyzer()
     let kind = "LiDAR"
 
-    private let queue = DispatchQueue(label: "blindnav.lidar", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "navassist.lidar", qos: .userInitiated)
     private let classifier = SceneClassifier()
     private let stairs = StairDetector()
     private var busy = false
@@ -195,7 +195,7 @@ final class NeuralObstacleSource: ObstacleSource {
     let kind = "camera depth model"
 
     private let model: VNCoreMLModel
-    private let queue = DispatchQueue(label: "blindnav.depth", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "navassist.depth", qos: .userInitiated)
     private let classifier = SceneClassifier()
     private let stairs = StairDetector()
     private var busy = false

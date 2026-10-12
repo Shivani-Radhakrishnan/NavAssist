@@ -1,5 +1,5 @@
 import ARKit
-import BlindNavCore
+import NavAssistCore
 import Observation
 
 /// Owns the ARKit session: where the phone is, which way the user faces, and whether

@@ -1,0 +1,3 @@
+# analyze_trips.py and train_predictor.py use only the Python standard library.
+# Optional: adds a Wilcoxon signed-rank test to analyze_trips.py
+scipy

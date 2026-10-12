@@ -1,4 +1,4 @@
-import BlindNavCore
+import NavAssistCore
 import UIKit
 
 /// Vibration patterns, so directions can be felt as well as heard:

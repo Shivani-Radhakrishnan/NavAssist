@@ -1,5 +1,5 @@
 import ARKit
-import BlindNavCore
+import NavAssistCore
 
 /// Saves places to the app's Documents folder:
 ///     Documents/Places/<name>/place.json    routes and landmarks

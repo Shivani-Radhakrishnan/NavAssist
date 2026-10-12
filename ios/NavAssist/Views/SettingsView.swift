@@ -1,4 +1,4 @@
-import BlindNavCore
+import NavAssistCore
 import SwiftUI
 
 struct SettingsView: View {

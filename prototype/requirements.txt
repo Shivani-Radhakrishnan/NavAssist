@@ -1,0 +1,7 @@
+# Python 3.10 (versions this prototype was developed with)
+numpy==2.2.6
+opencv-python==5.0.0.93
+matplotlib==3.10.9
+# step11.py only (Depth Anything V2 on the iPhone camera)
+torch==2.14.1
+transformers==5.19.0

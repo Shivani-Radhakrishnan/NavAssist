@@ -1,4 +1,4 @@
-"""Train BlindNav's hesitation and early-turn predictor from real trip logs.
+"""Train NavAssist's hesitation and early-turn predictor from real trip logs.
 
 Usage:
     python analysis/train_predictor.py all_trips.csv [-o predictor.json]
@@ -8,8 +8,8 @@ next 2 seconds, so the model learns to warn *before* it happens. Two logistic re
 are fitted on the f_* feature columns the app exports (same order the app uses), evaluated
 with leave-one-participant-out, and saved as predictor.json.
 
-To use the trained model: copy predictor.json into the BlindNav folder in the Files app
-(On My iPhone > BlindNav), or into ios/BlindNav/ before building.
+To use the trained model: copy predictor.json into the NavAssist folder in the Files app
+(On My iPhone > NavAssist), or into ios/NavAssist/ before building.
 """
 import argparse
 import csv

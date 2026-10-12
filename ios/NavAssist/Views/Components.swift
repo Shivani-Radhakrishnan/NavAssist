@@ -1,4 +1,4 @@
-import BlindNavCore
+import NavAssistCore
 import SwiftUI
 
 /// A large, full-width button: easy to find by touch and with VoiceOver.

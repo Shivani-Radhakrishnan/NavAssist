@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import BlindNavCore
+@testable import NavAssistCore
 
 /// A flat wall of points `distance` m ahead spanning lateral range `from...to`.
 func wall(at distance: Double, from: Double, to: Double, height: ClosedRange<Double> = 0.2...1.8) -> [ObstaclePoint] {

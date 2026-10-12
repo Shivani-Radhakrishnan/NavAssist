@@ -6,10 +6,10 @@ on:
 
 jobs:
   core:
-    name: BlindNavCore tests
+    name: NavAssistCore tests
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Run tests
-        working-directory: ios/BlindNavCore
+        working-directory: ios/NavAssistCore
         run: swift test

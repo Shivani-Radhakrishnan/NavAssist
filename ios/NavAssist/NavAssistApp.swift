@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct BlindNavApp: App {
+struct NavAssistApp: App {
     @State private var app = AppServices()
 
     var body: some Scene {

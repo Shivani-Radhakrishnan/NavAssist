@@ -1,5 +1,5 @@
 import ARKit
-import BlindNavCore
+import NavAssistCore
 import Observation
 import UIKit
 

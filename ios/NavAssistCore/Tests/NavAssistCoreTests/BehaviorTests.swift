@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import BlindNavCore
+@testable import NavAssistCore
 
 enum WalkerStyle {
     case follows                    // walks exactly to each corner

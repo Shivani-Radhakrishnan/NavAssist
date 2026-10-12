@@ -1,4 +1,4 @@
-"""Compare navigation errors with and without BlindNav's predictive cues.
+"""Compare navigation errors with and without NavAssist's predictive cues.
 
 Usage:
     python analysis/analyze_trips.py all_trips.csv [more.csv ...]

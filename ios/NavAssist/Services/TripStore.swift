@@ -1,4 +1,4 @@
-import BlindNavCore
+import NavAssistCore
 import Foundation
 
 /// Saves trip logs to Documents/Trips (visible in the Files app under "On My iPhone › NavAssist").

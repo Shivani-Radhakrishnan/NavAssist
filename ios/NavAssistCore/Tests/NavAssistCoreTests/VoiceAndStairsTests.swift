@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import BlindNavCore
+@testable import NavAssistCore
 
 // MARK: - Voice commands
 

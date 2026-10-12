@@ -1,4 +1,4 @@
-import BlindNavCore
+import NavAssistCore
 import Foundation
 import Observation
 
@@ -19,7 +19,6 @@ final class AppSettings {
     /// Study mode: predictive cues alternate on/off between trips, for a fair comparison.
     var studyMode: Bool { didSet { defaults.set(studyMode, forKey: "studyMode") } }
     var participant: String { didSet { defaults.set(participant, forKey: "participant") } }
-    var tripCounter: Int { didSet { defaults.set(tripCounter, forKey: "tripCounter") } }
 
     init() {
         defaults.register(defaults: [
@@ -37,17 +36,18 @@ final class AppSettings {
         adaptiveCues = defaults.bool(forKey: "adaptiveCues")
         studyMode = defaults.bool(forKey: "studyMode")
         participant = defaults.string(forKey: "participant") ?? "P1"
-        tripCounter = defaults.integer(forKey: "tripCounter")
     }
 
     /// Whether the next trip gets predictive cues. In study mode trips alternate, and the
     /// starting condition alternates between participants (P1 starts with cues, P2 without...).
     func nextTripIsAdaptive() -> Bool {
         guard studyMode else { return adaptiveCues }
+        // Counted per participant, so one person's odd number of trips can't flip the next person's order.
+        let key = "tripCounter." + participant
+        let count = defaults.integer(forKey: key)
         let digits = Int(participant.filter(\.isNumber)) ?? 1
-        let adaptive = (tripCounter + digits) % 2 == 1
-        tripCounter += 1
-        return adaptive
+        defaults.set(count + 1, forKey: key)
+        return (count + digits) % 2 == 1
     }
 
     var phrasing: Phrasing { Phrasing(unit: unit, stepLength: stepLength) }

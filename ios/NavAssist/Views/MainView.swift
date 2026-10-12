@@ -1,4 +1,4 @@
-import BlindNavCore
+import NavAssistCore
 import SwiftUI
 
 /// The only screen. The camera fills it; tapping anywhere starts a voice command.
