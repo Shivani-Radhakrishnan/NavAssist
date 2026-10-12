@@ -1,6 +1,6 @@
 # NavAssist
 
-**Voice-first indoor navigation for blind and low-vision people, on an iPhone.**
+**Voice-first indoor navigation for blind and low-vision people, on iPhone and iPad.**
 
 [![Tests](https://github.com/Shivani-Radhakrishnan/NavAssist/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Shivani-Radhakrishnan/NavAssist/actions/workflows/tests.yml)
 
@@ -21,7 +21,7 @@ tap anywhere and speak.
 | **Voice commands** | "Save this place as…", "Take me to…", "Where is the exit?", "Where am I?", "What's around?", "Stop", "Repeat", "Help". Speech recognition runs on the device. |
 | **Turn-by-turn guidance** | A* routing over walked paths only. Warns before turns, gives clock-face corrections ("Turn to 9 o'clock"), and re-plans when you go off route. Vibrations: 2 taps = left, 3 = right. |
 | **Sign reading** | On-device OCR reads signs ("Room 204", "Exit"), speaks them, and remembers where they are, so "take me to room 204" works without anyone saving it. |
-| **Obstacles** | Warns about things in a 60 cm walking corridor, plus anything you're about to brush past. LiDAR on Pro iPhones; on other iPhones, Depth Anything V2 converted to meters with ARKit feature points. |
+| **Obstacles** | Warns about things in a 60 cm walking corridor, plus anything you're about to brush past. LiDAR on Pro iPhones and iPad Pros; on other iPhones, Depth Anything V2 converted to meters with ARKit feature points. |
 | **Doors and stairs** | Recognizes doors with ARKit plane classification and Apple's image classifier. Detects drops and steps from the walking-surface profile, and warns about stairs on known routes from recorded heights. |
 | **Predictive cues** | Predicts hesitation and early turns from motion signals about 2 s ahead and steps in ("Not yet, keep straight for 2 meters"). Includes a study mode and scripts to measure the effect. |
 
@@ -102,7 +102,8 @@ the predictor. See **[docs/research-study.md](docs/research-study.md)**.
 
 ## Status and limitations
 
-NavAssist runs on a real iPhone.
+NavAssist runs on iPhone and iPad (portrait). An Android version would need a separate app
+built on ARCore; the navigation logic in `NavAssistCore` is platform-independent and could be ported.
 
 - Routes exist only where someone has walked with the app open.
 - Recognizing a place needs it to look roughly as it did when mapped. Big lighting or

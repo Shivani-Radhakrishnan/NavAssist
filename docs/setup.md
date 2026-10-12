@@ -1,9 +1,9 @@
-# Setting up NavAssist on an iPhone
+# Setting up NavAssist on an iPhone or iPad
 
 ## Requirements
 
 - A Mac with **Xcode 16 or later** (free from the Mac App Store).
-- An iPhone with **iOS 17 or later**. The iOS Simulator can show the screen, but it can't track
+- An iPhone or iPad with **iOS / iPadOS 17 or later** (any model with an A12 chip or newer). The iOS Simulator can show the screen, but it can't track
   movement, so real use needs a real phone.
 - An Apple ID. A free account works.
 
@@ -24,7 +24,7 @@ With a free Apple account, the app stops opening after 7 days. Press Run again t
 
 ## The depth model (iPhones without LiDAR)
 
-Pro iPhones use their LiDAR sensor and don't need this. On other iPhones, obstacle, door and
+Pro iPhones and iPad Pros use their LiDAR sensor and don't need this. On other iPhones, obstacle, door and
 stair detection need Apple's Core ML build of Depth Anything V2 (about 50 MB, Apache 2.0
 licence). It isn't committed to this repository.
 
