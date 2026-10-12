@@ -173,8 +173,9 @@ final class NeuralObstacleSource: ObstacleSource {
     private func estimate(_ image: CVPixelBuffer) -> ZoneReading? {
         let request = VNCoreMLRequest(model: model)
         request.imageCropAndScaleOption = .scaleFill
-        // .right = phone held upright in portrait, so the result is upright too.
-        let handler = VNImageRequestHandler(cvPixelBuffer: image, orientation: .right)
+        // The model wants a landscape 518 x 392 picture, the same shape as the camera's own
+        // (landscape) image, so feed it unrotated (no stretching) and rotate the result upright below.
+        let handler = VNImageRequestHandler(cvPixelBuffer: image, orientation: .up)
         guard (try? handler.perform([request])) != nil else { return nil }
 
         var grid: (data: [Float], width: Int, height: Int)?
@@ -184,7 +185,9 @@ final class NeuralObstacleSource: ObstacleSource {
                   let arr = obs.featureValue.multiArrayValue {
             grid = Self.floats(from: arr)
         }
-        guard var g = grid, g.width > 0 else { return nil }
+        guard let raw = grid, raw.width > 0 else { return nil }
+        // Phone held upright: turn the landscape result so "up" in the array is up in the world.
+        var g = rotateClockwise(raw.data, width: raw.width, height: raw.height)
 
         // The analyzer expects "bigger = closer". Work out which way this model's output
         // goes from the first frames: the floor at the bottom is nearer than the top.
