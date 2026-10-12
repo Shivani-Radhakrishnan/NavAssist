@@ -1,0 +1,19 @@
+.DS_Store
+
+# Python prototype
+venv/
+__pycache__/
+prototype/rgbd_dataset_*/
+prototype/map.npy
+
+# Swift / Xcode
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+ios/BlindNav.xcodeproj/project.xcworkspace/
+
+# Depth model for non-LiDAR iPhones (about 50 MB, downloaded separately)
+*.mlpackage/
+*.mlmodel

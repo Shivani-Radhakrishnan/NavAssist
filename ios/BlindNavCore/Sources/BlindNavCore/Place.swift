@@ -1,0 +1,42 @@
+import Foundation
+
+/// A recorded place (a home, an office floor...) as saved to disk.
+///
+/// The ARKit world map that lets the phone recognise the place again is saved next to
+/// this file as raw data by the app; this struct holds everything else.
+public struct PlaceFile: Codable, Equatable, Sendable {
+    public static let currentVersion = 1
+
+    public var version: Int
+    public var name: String
+    public var created: Date
+    public var graph: RouteGraph
+
+    public init(name: String, graph: RouteGraph, created: Date = Date()) {
+        self.version = Self.currentVersion
+        self.name = name
+        self.created = created
+        self.graph = graph
+    }
+
+    public func encoded() throws -> Data {
+        let enc = JSONEncoder()
+        enc.dateEncodingStrategy = .iso8601
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try enc.encode(self)
+    }
+
+    public static func decode(_ data: Data) throws -> PlaceFile {
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .iso8601
+        return try dec.decode(PlaceFile.self, from: data)
+    }
+
+    /// File-system-safe folder name for a place.
+    public static func folderName(for name: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: " -_"))
+        let cleaned = String(name.unicodeScalars.map { allowed.contains($0) ? Character($0) : "_" })
+            .trimmingCharacters(in: .whitespaces)
+        return cleaned.isEmpty ? "Place" : cleaned
+    }
+}

@@ -1,0 +1,25 @@
+import SwiftUI
+
+@main
+struct BlindNavApp: App {
+    @State private var app = AppServices()
+
+    var body: some Scene {
+        WindowGroup {
+            RootView()
+                .environment(app)
+        }
+    }
+}
+
+struct RootView: View {
+    @Environment(AppServices.self) private var app
+
+    var body: some View {
+        if app.settings.acceptedSafetyNotice {
+            HomeView()
+        } else {
+            SafetyNoticeView()
+        }
+    }
+}
