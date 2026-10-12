@@ -10,23 +10,37 @@ struct PlaceListView: View {
     @State private var newName = ""
     @State private var confirmDelete: PlaceFile?
 
+    /// The typed name, or "Place 1", "Place 2"... if blank. A name that would overwrite a
+    /// saved place (same folder on disk) gets a number added instead of being refused.
+    private var placeName: String {
+        let typed = newName.trimmingCharacters(in: .whitespaces)
+        let taken = Set(places.map { PlaceFile.folderName(for: $0.name) })
+        func free(_ n: String) -> Bool { !taken.contains(PlaceFile.folderName(for: n)) }
+        if !typed.isEmpty, free(typed) { return typed }
+        let base = typed.isEmpty ? "Place" : typed
+        var i = typed.isEmpty ? 1 : 2
+        while !free("\(base) \(i)") { i += 1 }
+        return "\(base) \(i)"
+    }
+
     var body: some View {
         List {
             if purpose == .record {
-                Section("New place") {
-                    TextField("Name, for example Home or Office floor 2", text: $newName)
+                Section {
+                    TextField("Home", text: $newName)
                         .font(.title3)
-                        .submitLabel(.go)
+                        .textFieldStyle(.roundedBorder)
+                        .submitLabel(.done)
+                        .accessibilityLabel("Place name")
                     NavigationLink {
-                        RecordView(name: newName.trimmingCharacters(in: .whitespaces), existing: nil)
+                        RecordView(name: placeName, existing: nil)
                     } label: {
-                        Label("Start recording", systemImage: "record.circle").font(.title3)
+                        Label("Start recording \(placeName)", systemImage: "record.circle").font(.title3)
                     }
-                    .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty
-                              || places.contains {
-                                  PlaceFile.folderName(for: $0.name)
-                                      == PlaceFile.folderName(for: newName.trimmingCharacters(in: .whitespaces))
-                              })
+                } header: {
+                    Text("New place")
+                } footer: {
+                    Text("Type a name for this place, or leave it blank to use \"\(placeName)\".")
                 }
             }
             Section(purpose == .record ? "Add routes to a saved place" : "Choose a place") {
