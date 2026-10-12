@@ -22,3 +22,6 @@ ios/NavAssist.xcodeproj/project.xcworkspace/
 .vscode/
 .idea/
 *.pyc
+
+# Local tooling
+.claude/
