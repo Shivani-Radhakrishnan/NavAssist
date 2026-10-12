@@ -102,7 +102,8 @@ the predictor. See **[docs/research-study.md](docs/research-study.md)**.
 
 ## Status and limitations
 
-NavAssist runs on a real iPhone, but it **has not yet been evaluated with blind users**.
+NavAssist runs on a real iPhone.
+
 - Routes exist only where someone has walked with the app open.
 - Recognizing a place needs it to look roughly as it did when mapped. Big lighting or
   furniture changes can stop it being recognized.

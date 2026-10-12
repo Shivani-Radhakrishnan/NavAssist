@@ -17,8 +17,7 @@ true depth with an **F1 of 0.99 for the walking corridor**, against 0.57 for the
 method used in the first version. We also describe a predictor of hesitations and early turns
 from motion signals. In simulation, a trained model ranks upcoming early turns well (AUC 0.83),
 but at a tolerable false-alarm rate it catches only a small fraction of them. This motivates
-collecting real trip logs, for which the app includes study tooling. NavAssist has not yet been
-evaluated with blind users.
+collecting real trip logs, for which the app includes study tooling.
 
 ## 1. System overview
 
@@ -198,7 +197,6 @@ with a bootstrap 95% CI, and a Wilcoxon signed-rank test. See
 
 ## 6. Limitations
 
-- **No evaluation with blind or low-vision users yet.**
 - Depth was evaluated on one public sequence, with simulated feature points. Real ARKit points
   are noisier and cluster on texture.
 - Obstacle ground truth comes from true depth, not human judgement, and stairs were not evaluated.

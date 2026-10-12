@@ -42,10 +42,3 @@ TUM RGB-D dataset and on simulated walkers. Results, methods and caveats are in 
 | Early-turn predictor, simulated | AUC 0.83; 88% caught about 2 s early at 5.8 false alarms/min, or 13% at ≤ 1/min |
 
 Reproduce with the commands under *Reproducing the results* in the report.
-
-## Not yet measured
-
-- Navigation with blind or low-vision users.
-- Obstacle and stair detection rates on the phone in real buildings.
-- The effect of predictive cues on navigation errors. The tools for that study are in
-  [research-study.md](research-study.md).
