@@ -67,7 +67,7 @@ movement, so real testing needs a real phone.
 1. Open `ios/BlindNav.xcodeproj` in Xcode.
 2. Select the **BlindNav** target, then **Signing & Capabilities**. Choose your Apple ID
    under *Team* (add it in Xcode › Settings › Accounts; a free account works). Change
-   *Bundle Identifier* from `com.example.BlindNav` to something unique, such as
+   *Bundle Identifier* from `com.shivaniradhakrishnan.BlindNav` to your own if you fork this, such as
    `com.<yourname>.BlindNav`.
 3. Connect the iPhone with a cable. On the iPhone, turn on Settings › Privacy & Security ›
    **Developer Mode**.
