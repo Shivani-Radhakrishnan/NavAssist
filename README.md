@@ -9,32 +9,37 @@ buildings, and warns about obstacles in front of the user.
 
 ## How it works
 
-1. **A sighted helper records the place once.** They open *Record a place* and walk every
-   route the user will need at a normal pace, holding the phone upright. At each
-   destination they tap **Add landmark** and name it ("Kitchen", "Front door", "Desk 14").
-   The app saves the walked paths and an ARKit map of the surroundings.
-2. **The user navigates.** They open *Navigate*, choose the place, and slowly turn around
-   until the phone recognizes where they are. Then they pick a destination from a list
-   that works with VoiceOver.
-3. **Guidance.** The app plans the shortest route along the recorded paths, then gives
-   directions as the user walks:
-   - "Route to Kitchen, 14 meters." / "Walk straight ahead, 6 meters."
-   - "In 2 meters, turn right." then "Turn right now. Then walk 4 meters."
-   - Clock-face corrections when the user faces the wrong way: "Turn to 9 o'clock". Once
-     they're facing correctly: "Straight ahead".
-   - "Off route. Recalculating." when they drift more than 1.5 m from the route.
-   - "You have arrived at Kitchen."
-   - Vibrations: 2 taps = turn left, 3 taps = turn right, a heavy thud = obstacle.
-4. **Obstacle warnings** run during navigation, and also on their own (*Obstacle detector*):
-   "Obstacle ahead, 1 meter, clearer on the left", "Stop. Obstacle right in front."
-   - **iPhone Pro (LiDAR):** measured 3-D distances. The floor and ceiling are filtered
-     out by height, so head-height obstacles that a cane misses are still caught.
-   - **Other iPhones:** a Depth Anything V2 neural network estimates depth from the camera,
-     using the floor as a ruler, the same method as `prototype/step11.py`. Less reliable.
-     It needs the model file; see [Adding the depth model](#adding-the-depth-model).
+There is one screen. The camera fills it, and **tapping anywhere starts a voice command**.
+With VoiceOver on, double-tap the screen or use the two-finger double-tap (magic tap).
 
-Only recorded paths are used for routes, so the app never sends someone through space
-that nobody has actually walked.
+- **It maps on its own.** When the app opens, it tries to recognize a place it has mapped
+  before (the most recently used place first). If it doesn't recognize one, it starts a new
+  map. Every path you walk with the app open is recorded and saved automatically.
+- **Voice commands:**
+  - "Save this place as kitchen", "Record location kitchen", "This is the front door"
+  - "Take me to the kitchen", "Navigate to room 204", "How do I get to the exit"
+  - "Where is the exit?" (distance and clock direction), "Where am I?", "What's around?"
+  - "Stop", "Repeat", "What places do you know?", "Help"
+- **It reads signs.** On-device text recognition reads signs like "Room 204" or "Exit",
+  speaks them ("Sign: Room 204"), and remembers where each one was. "Take me to room 204"
+  then works even if nobody saved that name. Spoken numbers ("room two oh four") and
+  near-misses ("rest room" vs "Restroom") are matched, but different room numbers never are.
+- **Directions** follow only paths that have been walked:
+  - "Route to Kitchen, 14 meters." / "In 2 meters, turn right." / "Turn right now."
+  - Clock-face corrections ("Turn to 9 o'clock"), then "Straight ahead" once facing correctly.
+  - "Off route. Recalculating." / "You have arrived at Kitchen."
+  - Vibrations: 2 taps = turn left, 3 taps = turn right, a heavy thud = obstacle or stairs.
+- **Stairs** are recognized from the heights recorded while walking: "Stairs going down in
+  3 meters, about 12 steps. Hold the handrail." / "Stairs now, going down." / "End of stairs."
+  Floors are kept apart, so a corridor upstairs is never mistaken for the one below.
+- **Obstacle warnings**: "Obstacle ahead, 1 meter, clearer on the left", "Stop. Obstacle
+  right in front."
+  - **iPhone Pro (LiDAR):** measured 3-D distances, with the floor and ceiling filtered out,
+    so head-height obstacles are caught.
+  - **Other iPhones:** a Depth Anything V2 network estimates depth from the camera. It needs
+    the model file; see [Adding the depth model](#adding-the-depth-model).
+
+Settings (the gear) holds distance units, voice speed, vibrations, and the list of saved maps.
 
 ## Repository layout
 
@@ -53,7 +58,7 @@ prototype/                The original Python step-by-step prototype (TUM RGB-D 
 cd ios/BlindNavCore && swift test
 ```
 
-There are 28 tests. They cover routing between separately recorded walks, simplifying ARKit
+There are 40 tests (60 checks including each voice phrasing). They cover routing between separately recorded walks, simplifying ARKit
 wobble into clean legs, simulated walks around corners, off-route detection, rate-limited
 corrections, obstacle zones (floor removal, head-height obstacles, the "stop" distance),
 and making sure warnings don't flicker.
@@ -87,24 +92,21 @@ This is only needed for iPhones **without** LiDAR (non-Pro models).
 2. Put it in `ios/BlindNav/` next to `BlindNavApp.swift`. Xcode adds it automatically.
 3. Build again. *Obstacle detector* should now say "Using camera depth model".
 
-## Tips for recording a good place
+## Tips for good maps
 
 - Use good, even lighting. ARKit tracks visual detail, so plain white walls and dark rooms
   are hard.
-- Walk slowly and sweep the camera across walls and furniture. Save when the screen shows
-  **Map quality: good**.
-- Walk the routes the user will actually take, through the middle of corridors and
-  doorways. Where two routes cross, walk through the crossing so the app links them.
-- Stand exactly where the user should arrive before you add a landmark.
-- Use *Pause* while walking somewhere that shouldn't become a route.
-- Record again (*Record a place › Add routes to a saved place*) if furniture moves a lot.
+- The first time in a new place, walk slowly and look around. A sighted companion can help
+  by walking the main routes once and saving the important places by voice.
+- Where two routes cross, walk through the crossing so the app links them.
+- Stand exactly where you want to arrive before saying "save this place as...".
 
 ## Known limitations
 
-- Routes exist only where someone has walked. Destinations must be added by a sighted helper.
+- Routes exist only where someone has walked with the app open.
 - Finding the user's location needs the room to look roughly as it did when it was recorded.
   Big lighting or furniture changes can stop the place from being recognized.
-- No stair or drop-off detection.
+- Stairs are only known on paths walked before; new stairs or drop-offs ahead are not detected.
 - No moving-obstacle prediction. People walking past are treated like any other obstacle.
 - The camera must point forward. Guidance pauses (and says so) if tracking is lost,
   for example when the phone goes into a pocket.

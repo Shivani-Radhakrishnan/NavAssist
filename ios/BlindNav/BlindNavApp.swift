@@ -17,7 +17,7 @@ struct RootView: View {
 
     var body: some View {
         if app.settings.acceptedSafetyNotice {
-            HomeView()
+            MainView()
         } else {
             SafetyNoticeView()
         }

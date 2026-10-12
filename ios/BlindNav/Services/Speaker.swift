@@ -15,9 +15,6 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable 
     override init() {
         super.init()
         synth.delegate = self
-        // Duck music/podcasts only while a sentence is being spoken.
-        try? AVAudioSession.sharedInstance().setCategory(
-            .playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
     }
 
     func say(_ text: String, urgent: Bool = false) {
@@ -42,7 +39,13 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable 
         let u = AVSpeechUtterance(string: text)
         u.rate = rate
         u.prefersAssistiveTechnologySettings = true   // use the user's VoiceOver voice if set
-        try? AVAudioSession.sharedInstance().setActive(true)
+        // Duck music/podcasts only while a sentence is being spoken. Set every time, because
+        // listening for a voice command switches the audio session to recording.
+        let audio = AVAudioSession.sharedInstance()
+        if audio.category != .playback {
+            try? audio.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
+        }
+        try? audio.setActive(true)
         synth.speak(u)
     }
 

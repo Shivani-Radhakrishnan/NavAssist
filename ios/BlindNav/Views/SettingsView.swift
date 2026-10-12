@@ -3,6 +3,9 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppServices.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    @State private var places: [PlaceFile] = []
+    @State private var confirmDelete: PlaceFile?
 
     var body: some View {
         @Bindable var s = app.settings
@@ -41,11 +44,37 @@ struct SettingsView: View {
                      ? "This iPhone has LiDAR, so obstacle distances are measured."
                      : "This iPhone has no LiDAR. Obstacle warnings use a depth model and are less reliable.")
             }
+            Section {
+                if places.isEmpty { Text("No maps saved yet.") }
+                ForEach(places, id: \.name) { p in
+                    VStack(alignment: .leading) {
+                        Text(p.name).font(.headline)
+                        Text("\(p.graph.landmarks.count) saved places · \(p.graph.nodes.filter { $0.signText != nil }.count) signs")
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                .onDelete { idx in confirmDelete = idx.first.map { places[$0] } }
+            } header: {
+                Text("Saved maps")
+            } footer: {
+                Text("Maps are made automatically as you walk. Swipe left on one to delete it. Changes apply the next time BlindNav opens.")
+            }
             Section("About") {
                 Button("Show the safety notice again") { s.acceptedSafetyNotice = false }
             }
         }
         .navigationTitle("Settings")
+        .toolbar { Button("Done") { dismiss() } }
+        .onAppear { places = app.store.list() }
         .onDisappear { app.applySettings() }
+        .confirmationDialog("Delete \(confirmDelete?.name ?? "")? Everything saved there will be forgotten.",
+                            isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
+                            titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                if let p = confirmDelete { try? app.store.delete(p) }
+                places = app.store.list()
+            }
+        }
     }
 }

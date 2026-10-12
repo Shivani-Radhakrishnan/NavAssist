@@ -187,7 +187,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = BlindNav;
-				INFOPLIST_KEY_NSCameraUsageDescription = "BlindNav uses the camera to track where you walk and to warn you about obstacles in front of you.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "BlindNav uses the camera to map where you walk, read signs, and warn you about obstacles in front of you.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BlindNav listens for your voice commands, such as save this place or take me to the kitchen, after you tap the screen.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "BlindNav turns your voice commands into text so it can act on them. This happens on your iPhone when possible.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiredDeviceCapabilities = arkit;
@@ -215,7 +217,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = BlindNav;
-				INFOPLIST_KEY_NSCameraUsageDescription = "BlindNav uses the camera to track where you walk and to warn you about obstacles in front of you.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "BlindNav uses the camera to map where you walk, read signs, and warn you about obstacles in front of you.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BlindNav listens for your voice commands, such as save this place or take me to the kitchen, after you tap the screen.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "BlindNav turns your voice commands into text so it can act on them. This happens on your iPhone when possible.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiredDeviceCapabilities = arkit;

@@ -38,11 +38,14 @@ final class ARController: NSObject, ARSessionDelegate {
     private(set) var mapping: ARFrame.WorldMappingStatus = .notAvailable
     private(set) var position: Vec2 = .zero
     private(set) var heading = Vec2(0, 1)
+    /// Height of the phone in the map, in meters. Used to notice stairs.
+    private(set) var height: Double = 0
 
-    /// Called about 10 times a second while tracking is normal.
-    @ObservationIgnored var onPose: ((Vec2, Vec2, TimeInterval) -> Void)?
+    /// Called about 10 times a second while tracking is normal: position, heading, height, time.
+    @ObservationIgnored var onPose: ((Vec2, Vec2, Double, TimeInterval) -> Void)?
     @ObservationIgnored var onTrackingChange: ((Tracking) -> Void)?
     @ObservationIgnored var obstacleSource: ObstacleSource?
+    @ObservationIgnored var signReader: SignReader?
 
     @ObservationIgnored private var startedWithMap = false
     @ObservationIgnored private var floorY: Float?
@@ -66,6 +69,7 @@ final class ARController: NSObject, ARSessionDelegate {
         onPose = nil
         onTrackingChange = nil
         obstacleSource = nil
+        signReader = nil
         setTracking(.stopped)
     }
 
@@ -91,11 +95,13 @@ final class ARController: NSObject, ARSessionDelegate {
             mapping = frame.worldMappingStatus
             position = Vec2(fromWorldX: t.columns.3.x, z: t.columns.3.z)
             heading = h
+            height = Double(t.columns.3.y)
             updateFloor(frame, cameraY: t.columns.3.y)
-            if tracking.isNormal { onPose?(position, heading, frame.timestamp) }
+            if tracking.isNormal { onPose?(position, heading, height, frame.timestamp) }
         }
         guard tracking.isNormal else { return }
         obstacleSource?.process(frame: frame, floorY: floorY ?? (t.columns.3.y - 1.35), heading: h)
+        signReader?.process(frame: frame)
     }
 
     func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {

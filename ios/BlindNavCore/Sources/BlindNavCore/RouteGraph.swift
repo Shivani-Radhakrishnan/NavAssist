@@ -1,14 +1,23 @@
 import Foundation
 
-/// The walkable network of a place: the paths a sighted helper actually walked.
+/// The walkable network of a place: the paths someone has actually walked with the app open.
 ///
 /// Every edge is a stretch someone has physically walked, so routes only ever use
-/// space known to be passable. Landmarks ("Kitchen", "Front door") are named nodes.
+/// space known to be passable. Destinations are nodes with a spoken name ("Kitchen")
+/// or with the text of a sign the camera read there ("Room 204").
 public struct RouteGraph: Codable, Sendable, Equatable {
     public struct Node: Codable, Sendable, Equatable, Identifiable {
         public let id: Int
         public var position: Vec2
+        /// Height of the phone above the map's origin, in meters. Changes along a route mean stairs.
+        public var height: Double?
+        /// Name the user gave this spot.
         public var landmark: String?
+        /// Text of a sign read by the camera at this spot.
+        public var signText: String?
+
+        /// What to call this spot when speaking.
+        public var spokenName: String? { landmark ?? signText }
     }
 
     public private(set) var nodes: [Node] = []
@@ -17,17 +26,21 @@ public struct RouteGraph: Codable, Sendable, Equatable {
 
     public init() {}
 
+    /// Spots the user named, alphabetically.
     public var landmarks: [Node] {
         nodes.filter { $0.landmark != nil }
             .sorted { ($0.landmark ?? "").localizedCaseInsensitiveCompare($1.landmark ?? "") == .orderedAscending }
     }
 
+    /// Spots the user named plus spots where a sign was read.
+    public var destinations: [Node] { nodes.filter { $0.spokenName != nil } }
+
     public func node(_ id: Int) -> Node { nodes[id] }
 
     @discardableResult
-    public mutating func addNode(at p: Vec2, landmark: String? = nil) -> Int {
+    public mutating func addNode(at p: Vec2, height: Double? = nil, landmark: String? = nil) -> Int {
         let id = nodes.count
-        nodes.append(Node(id: id, position: p, landmark: landmark))
+        nodes.append(Node(id: id, position: p, height: height, landmark: landmark, signText: nil))
         neighbours[id] = []
         return id
     }
@@ -42,14 +55,20 @@ public struct RouteGraph: Codable, Sendable, Equatable {
         nodes[id].landmark = name
     }
 
-    public mutating func removeLandmark(named name: String) {
-        for i in nodes.indices where nodes[i].landmark == name { nodes[i].landmark = nil }
+    public mutating func setSign(_ text: String?, on id: Int) {
+        nodes[id].signText = text
     }
 
-    /// Nearest node to p, if any is within `maxDistance` meters.
-    public func nearestNode(to p: Vec2, within maxDistance: Double = .infinity) -> Int? {
+    public mutating func removeLandmark(named name: String) {
+        let key = PlaceMatcher.normalize(name)
+        for i in nodes.indices where nodes[i].landmark.map(PlaceMatcher.normalize) == key { nodes[i].landmark = nil }
+    }
+
+    /// Nearest node to p, if any is within `maxDistance` meters (and, when heights are
+    /// known, on the same floor).
+    public func nearestNode(to p: Vec2, height: Double? = nil, within maxDistance: Double = .infinity) -> Int? {
         var best: (Int, Double)?
-        for n in nodes {
+        for n in nodes where sameFloor(n.height, height) {
             let d = n.position.distance(to: p)
             if d <= maxDistance, d < (best?.1 ?? .infinity) { best = (n.id, d) }
         }
@@ -90,14 +109,21 @@ public struct RouteGraph: Codable, Sendable, Equatable {
     }
 
     public func positions(of path: [Int]) -> [Vec2] { path.map { nodes[$0].position } }
+    public func heights(of path: [Int]) -> [Double?] { path.map { nodes[$0].height } }
 }
 
-/// Turns a stream of positions from a walking helper into a RouteGraph.
+/// Two heights are on the same floor unless both are known and more than 1.2 m apart.
+func sameFloor(_ a: Double?, _ b: Double?) -> Bool {
+    guard let a, let b else { return true }
+    return abs(a - b) < 1.2
+}
+
+/// Turns a stream of positions from someone walking into a RouteGraph.
 ///
-/// A node is dropped every `spacing` meters. When the helper comes back within
-/// `mergeRadius` of an older node (a junction or a loop), the trail joins that node
-/// instead of creating a duplicate, which is what makes routes between different
-/// recorded walks possible.
+/// A node is dropped every `spacing` meters. When the walker comes back within
+/// `mergeRadius` of an older node on the same floor (a junction or a loop), the trail
+/// joins that node instead of creating a duplicate, which is what makes routes between
+/// different walks possible.
 public struct TrailRecorder: Sendable {
     public var graph: RouteGraph
     public var spacing: Double
@@ -117,19 +143,24 @@ public struct TrailRecorder: Sendable {
         self.recentWindow = recentWindow
     }
 
-    /// Start a new walk (e.g. after a pause) without connecting it to the previous trail end.
+    /// Start a new walk (e.g. after tracking was lost) without connecting it to the previous trail end.
     public mutating func breakTrail() {
         lastNode = nil
         recent = []
     }
 
-    /// Feed the helper's current position. Returns true if the graph changed.
+    /// Feed the walker's current position. Returns true if the graph changed.
     @discardableResult
-    public mutating func add(_ p: Vec2) -> Bool {
-        if let last = lastNode, graph.node(last).position.distance(to: p) < spacing {
-            return false
+    public mutating func add(_ p: Vec2, height: Double? = nil) -> Bool {
+        if let last = lastNode {
+            let n = graph.node(last)
+            let dh = (height ?? 0) - (n.height ?? height ?? 0)
+            // On stairs most of the movement is vertical, so count it too.
+            if (n.position.distance(to: p) * n.position.distance(to: p) + dh * dh).squareRoot() < spacing {
+                return false
+            }
         }
-        let id = junction(near: p) ?? graph.addNode(at: p)
+        let id = junction(near: p, height: height) ?? graph.addNode(at: p, height: height)
         if let last = lastNode { graph.connect(last, id) }
         lastNode = id
         recent.append(id)
@@ -137,26 +168,51 @@ public struct TrailRecorder: Sendable {
         return true
     }
 
-    /// Name the spot where the helper is standing. Reuses a nearby node if there is one.
+    /// Name the spot where the user is standing. Reuses a nearby node if there is one,
+    /// and moves the name if it was used somewhere else before.
     @discardableResult
-    public mutating func markLandmark(_ name: String, at p: Vec2) -> Int {
+    public mutating func markLandmark(_ name: String, at p: Vec2, height: Double? = nil) -> Int {
         graph.removeLandmark(named: name)
-        let id: Int
-        if let near = graph.nearestNode(to: p, within: spacing * 0.6) {
-            id = near
-        } else {
-            id = graph.addNode(at: p)
-            if let last = lastNode { graph.connect(last, id) }
-            lastNode = id
-            recent.append(id)
-        }
+        let id = spot(at: p, height: height)
         graph.setLandmark(name, on: id)
         return id
     }
 
-    private func junction(near p: Vec2) -> Int? {
+    /// Remember a sign read at p. Returns nil if the same sign is already known within `dedupeRadius`.
+    @discardableResult
+    public mutating func markSign(_ text: String, at p: Vec2, height: Double? = nil, dedupeRadius: Double = 4) -> Int? {
+        let key = PlaceMatcher.normalize(text)
+        guard !key.isEmpty else { return nil }
+        let known = graph.nodes.contains {
+            $0.signText.map(PlaceMatcher.normalize) == key && sameFloor($0.height, height)
+                && $0.position.distance(to: p) <= dedupeRadius
+        }
+        if known { return nil }
+        let id = spot(at: p, height: height)
+        if let existing = graph.node(id).signText, existing != text {
+            // One sign per node: put this one on a fresh node joined to it.
+            let fresh = graph.addNode(at: p, height: height)
+            graph.connect(id, fresh)
+            graph.setSign(text, on: fresh)
+            return fresh
+        }
+        graph.setSign(text, on: id)
+        return id
+    }
+
+    private mutating func spot(at p: Vec2, height: Double?) -> Int {
+        if let near = graph.nearestNode(to: p, height: height, within: spacing * 0.6) { return near }
+        let id = graph.addNode(at: p, height: height)
+        if let last = lastNode { graph.connect(last, id) }
+        lastNode = id
+        recent.append(id)
+        return id
+    }
+
+    private func junction(near p: Vec2, height: Double?) -> Int? {
         var best: (Int, Double)?
-        for n in graph.nodes where !recent.contains(n.id) {
+        for n in graph.nodes where !recent.contains(n.id) && sameFloor(n.height, height) {
+            if let h = height, let nh = n.height, abs(h - nh) > 0.3 { continue }   // not across a stair flight
             let d = n.position.distance(to: p)
             if d <= mergeRadius, d < (best?.1 ?? .infinity) { best = (n.id, d) }
         }

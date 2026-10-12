@@ -10,6 +10,8 @@ public struct PlaceFile: Codable, Equatable, Sendable {
     public var version: Int
     public var name: String
     public var created: Date
+    /// When the app was last used here; the most recent place is tried first at launch.
+    public var lastUsed: Date?
     public var graph: RouteGraph
 
     public init(name: String, graph: RouteGraph, created: Date = Date()) {

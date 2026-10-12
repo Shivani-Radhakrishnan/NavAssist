@@ -38,7 +38,11 @@ public struct GuidanceSettings: Codable, Equatable, Sendable {
 /// "turn to N o'clock" corrections at most every few seconds.
 public struct Guide: Sendable {
     public let route: [Vec2]
+    /// Flights of stairs (or single steps) along the route, from the recorded heights.
+    public let stairs: [StairFlight]
     public let destinationName: String
+    /// The map node being navigated to, so a new route can be planned after going off route.
+    public var destinationNodeID: Int?
     public var settings: GuidanceSettings
     public private(set) var target = 1
     public private(set) var finished = false
@@ -47,9 +51,15 @@ public struct Guide: Sendable {
     private var aligned = true
     private var lastHeadingPrompt = -Double.infinity
     private var approachAnnounced: Set<Int> = []
+    private var stairsWarned: Set<Int> = []
+    private var stairsStarted: Set<Int> = []
+    private var stairsEnded: Set<Int> = []
 
-    public init(route: [Vec2], destinationName: String, settings: GuidanceSettings = GuidanceSettings()) {
-        let simple = simplifyRoute(route, tolerance: 0.35)
+    /// `heights` (one per route point, from the map) lets the guide warn about stairs.
+    public init(route: [Vec2], heights: [Double?]? = nil, destinationName: String,
+                settings: GuidanceSettings = GuidanceSettings()) {
+        self.stairs = heights.map { findStairs(route: route, heights: $0) } ?? []
+        let simple = removeShortLegs(simplifyRoute(route, tolerance: 0.35), minLength: 0.6)
         self.route = simple.count >= 2 ? simple : (route.count == 1 ? [route[0], route[0]] : route)
         self.destinationName = destinationName
         self.settings = settings
@@ -116,6 +126,8 @@ public struct Guide: Sendable {
             lastHeadingPrompt = t
         }
 
+        out += stairCues(p)
+
         // Upcoming turn warning, once per turn.
         if !isLastLeg, !approachAnnounced.contains(target) {
             let d = p.distance(to: route[target])
@@ -158,6 +170,32 @@ public struct Guide: Sendable {
     }
 
     // MARK: - Helpers
+
+    private mutating func stairCues(_ p: Vec2) -> [GuidanceEvent] {
+        var out: [GuidanceEvent] = []
+        for (i, f) in stairs.enumerated() {
+            let toStart = p.distance(to: f.start)
+            if !stairsWarned.contains(i), toStart <= 4, toStart > 1.2 {
+                stairsWarned.insert(i)
+                out.append(.haptic(.obstacle))
+                out.append(.speak("\(f.description.prefix(1).uppercased() + f.description.dropFirst()) "
+                                  + "in \(say.distance(toStart)). \(f.steps > 2 ? "Hold the handrail." : "")", urgent: true))
+            }
+            if !stairsStarted.contains(i), toStart <= 1.2 {
+                stairsWarned.insert(i)
+                stairsStarted.insert(i)
+                out.append(.haptic(.stop))
+                out.append(.speak(f.steps == 1 ? "Step \(f.goingUp ? "up" : "down") now."
+                                  : "Stairs now, going \(f.goingUp ? "up" : "down").", urgent: true))
+            }
+            if stairsStarted.contains(i), !stairsEnded.contains(i), f.steps > 1, p.distance(to: f.end) <= 0.8 {
+                stairsEnded.insert(i)
+                out.append(.haptic(.onTrack))
+                out.append(.speak("End of stairs.", urgent: false))
+            }
+        }
+        return out
+    }
 
     private mutating func legCue(position p: Vec2, heading h: Vec2, prefix: String?) -> [GuidanceEvent] {
         let rel = signedAngle(from: h, to: route[target] - p)
@@ -220,4 +258,73 @@ public func simplifyRoute(_ pts: [Vec2], tolerance: Double) -> [Vec2] {
         }
     }
     return pts.indices.filter { keep[$0] }.map { pts[$0] }
+}
+
+
+/// A flight of stairs (or a single step) found from the heights recorded along a route.
+public struct StairFlight: Equatable, Sendable {
+    public var start: Vec2
+    public var end: Vec2
+    /// Positive = going up, in meters.
+    public var rise: Double
+    public var goingUp: Bool { rise > 0 }
+    /// Typical stair riser is about 17 cm.
+    public var steps: Int { max(1, Int((abs(rise) / 0.17).rounded())) }
+
+    public var description: String {
+        if steps == 1 { return "a step \(goingUp ? "up" : "down")" }
+        return "stairs going \(goingUp ? "up" : "down"), about \(steps) steps"
+    }
+}
+
+/// Stretches where the height changes steeply (more than 30 cm per meter walked) are stairs;
+/// ramps and ARKit's slow height drift are far gentler than that.
+public func findStairs(route: [Vec2], heights: [Double?]) -> [StairFlight] {
+    guard route.count == heights.count, route.count >= 2 else { return [] }
+    var flights: [StairFlight] = []
+    var current: (startIndex: Int, endIndex: Int, rise: Double)?
+    func close() {
+        if let c = current, abs(c.rise) >= 0.12 {
+            flights.append(StairFlight(start: route[c.startIndex], end: route[c.endIndex], rise: c.rise))
+        }
+        current = nil
+    }
+    for i in 0..<(route.count - 1) {
+        guard let h0 = heights[i], let h1 = heights[i + 1] else { close(); continue }
+        let dh = h1 - h0
+        let d = route[i].distance(to: route[i + 1])
+        let steep = abs(dh) >= 0.08 && abs(dh) / max(d, 0.05) >= 0.3
+        if steep, let c = current, (c.rise > 0) == (dh > 0) {
+            current = (c.startIndex, i + 1, c.rise + dh)
+        } else if steep {
+            close()
+            current = (i, i + 1, dh)
+        } else {
+            close()
+        }
+    }
+    close()
+    return flights
+}
+
+/// Merge legs shorter than `minLength` into their neighbours (keeping both ends of the
+/// route), so a wobble at a corner doesn't become an extra "turn" instruction.
+public func removeShortLegs(_ pts: [Vec2], minLength: Double) -> [Vec2] {
+    var p = pts
+    var changed = true
+    while changed && p.count > 2 {
+        changed = false
+        for i in 0..<(p.count - 1) where p[i].distance(to: p[i + 1]) < minLength {
+            if i + 1 < p.count - 1 {
+                p.remove(at: i + 1)      // drop the corner after the short piece
+            } else if i > 0 {
+                p.remove(at: i)          // short last piece: drop the corner before it
+            } else {
+                continue
+            }
+            changed = true
+            break
+        }
+    }
+    return p
 }
