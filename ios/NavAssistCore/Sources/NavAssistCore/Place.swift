@@ -28,10 +28,28 @@ public struct PlaceFile: Codable, Equatable, Sendable {
         return try enc.encode(self)
     }
 
+    public enum ValidationError: Error, Equatable {
+        case newerVersion(Int)
+        case corruptGraph(String)
+    }
+
+    /// Decode and check a saved place. A damaged or hand-edited file is rejected with an error
+    /// instead of crashing the app later (node ids out of order, edges to missing nodes).
     public static func decode(_ data: Data) throws -> PlaceFile {
         let dec = JSONDecoder()
         dec.dateDecodingStrategy = .iso8601
-        return try dec.decode(PlaceFile.self, from: data)
+        let place = try dec.decode(PlaceFile.self, from: data)
+        guard place.version <= currentVersion else { throw ValidationError.newerVersion(place.version) }
+        let n = place.graph.nodes.count
+        for (i, node) in place.graph.nodes.enumerated() where node.id != i {
+            throw ValidationError.corruptGraph("node \(i) has id \(node.id)")
+        }
+        for (id, nbs) in place.graph.neighbours {
+            guard id >= 0, id < n, nbs.allSatisfy({ $0 >= 0 && $0 < n }) else {
+                throw ValidationError.corruptGraph("edge from \(id) refers to a missing node")
+            }
+        }
+        return place
     }
 
     /// File-system-safe folder name for a place.

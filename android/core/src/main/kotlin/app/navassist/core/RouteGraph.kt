@@ -98,6 +98,18 @@ class RouteGraph {
         return null
     }
 
+    /**
+     * A route from near [from] to [to]: same-floor nodes within [within] m, nearest first (with
+     * [preferred], the node just walked from, ahead of the rest); the first that connects wins.
+     */
+    fun route(from: Vec2, height: Double? = null, within: Double = 3.0, to: Int, preferred: Int? = null): List<Int>? {
+        val candidates = _nodes.filter { sameFloor(it.height, height) && it.position.distanceTo(from) <= within }
+            .sortedBy { it.position.distanceTo(from) }.map { it.id }.toMutableList()
+        if (preferred != null && candidates.remove(preferred)) candidates.add(0, preferred)
+        for (c in candidates.take(12)) shortestPath(c, to)?.let { return it }
+        return null
+    }
+
     fun positions(path: List<Int>): List<Vec2> = path.map { _nodes[it].position }
     fun heights(path: List<Int>): List<Double?> = path.map { _nodes[it].height }
 }
@@ -116,7 +128,9 @@ class TrailRecorder(
     /** Recent nodes ignored when looking for a junction, so a straight walk doesn't snap back. */
     val recentWindow: Int = 6,
 ) {
-    private var lastNode: Int? = null
+    /** The node the walker most recently passed, which is known to be reachable from where they are. */
+    var lastNode: Int? = null
+        private set
     private val recent = ArrayDeque<Int>()
 
     /** Start a new walk without connecting it to the previous trail end. */
@@ -137,8 +151,7 @@ class TrailRecorder(
         val id = junction(p, height) ?: graph.addNode(p, height)
         lastNode?.let { graph.connect(it, id) }
         lastNode = id
-        recent.addLast(id)
-        if (recent.size > recentWindow) recent.removeFirst()
+        remember(id)
         return true
     }
 
@@ -150,8 +163,12 @@ class TrailRecorder(
         return id
     }
 
-    /** Remember a sign read at p. Returns null if the same sign is already known within [dedupeRadius]. */
-    fun markSign(text: String, at: Vec2, height: Double? = null, dedupeRadius: Double = 4.0): Int? {
+    /**
+     * Remember a sign read at [at]. Returns null if the same sign is already known within [dedupeRadius].
+     * With [attachWithin], it goes on an existing node within that distance of [at]
+     * (the sign's own position) and no new path is invented; null if none is near.
+     */
+    fun markSign(text: String, at: Vec2, height: Double? = null, dedupeRadius: Double = 4.0, attachWithin: Double? = null): Int? {
         val key = PlaceMatcher.normalize(text)
         if (key.isEmpty()) return null
         val known = graph.nodes.any {
@@ -159,7 +176,8 @@ class TrailRecorder(
                 it.position.distanceTo(at) <= dedupeRadius
         }
         if (known) return null
-        val id = spot(at, height)
+        val id = if (attachWithin != null) graph.nearestNode(at, height, within = attachWithin) ?: return null
+                 else spot(at, height)
         val existing = graph.node(id).signText
         if (existing != null && existing != text) {
             val fresh = graph.addNode(at, height)
@@ -176,8 +194,14 @@ class TrailRecorder(
         val id = graph.addNode(at, height)
         lastNode?.let { graph.connect(it, id) }
         lastNode = id
-        recent.addLast(id)
+        remember(id)
         return id
+    }
+
+    /** Keep the recent-node window at its size (it used to grow by one per landmark or sign). */
+    private fun remember(id: Int) {
+        recent.addLast(id)
+        while (recent.size > recentWindow) recent.removeFirst()
     }
 
     private fun junction(p: Vec2, height: Double?): Int? =

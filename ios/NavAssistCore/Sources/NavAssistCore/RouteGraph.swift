@@ -108,6 +108,24 @@ public struct RouteGraph: Codable, Sendable, Equatable {
         return nil
     }
 
+    /// A route from near `p` to `goal`: tries same-floor nodes within `within` meters, nearest
+    /// first (with `preferred`, the node just walked from, ahead of the rest), and returns the
+    /// first that actually connects. A stray fragment left by a tracking glitch can be nearer
+    /// than the real trail; picking it blindly used to give "no route".
+    public func route(from p: Vec2, height: Double? = nil, within: Double = 3, to goal: Int,
+                      preferred: Int? = nil) -> [Int]? {
+        var candidates = nodes.filter { sameFloor($0.height, height) && $0.position.distance(to: p) <= within }
+            .sorted { $0.position.distance(to: p) < $1.position.distance(to: p) }.map(\.id)
+        if let pref = preferred, candidates.contains(pref) {
+            candidates.removeAll { $0 == pref }
+            candidates.insert(pref, at: 0)
+        }
+        for c in candidates.prefix(12) {
+            if let path = shortestPath(from: c, to: goal) { return path }
+        }
+        return nil
+    }
+
     public func positions(of path: [Int]) -> [Vec2] { path.map { nodes[$0].position } }
     public func heights(of path: [Int]) -> [Double?] { path.map { nodes[$0].height } }
 }
@@ -132,7 +150,8 @@ public struct TrailRecorder: Sendable {
     /// doesn't snap back onto itself while walking a straight line.
     public var recentWindow: Int
 
-    private var lastNode: Int?
+    /// The node the walker most recently passed, which is known to be reachable from where they are.
+    public private(set) var lastNode: Int?
     private var recent: [Int] = []
 
     public init(graph: RouteGraph = RouteGraph(), spacing: Double = 0.5,
@@ -163,8 +182,7 @@ public struct TrailRecorder: Sendable {
         let id = junction(near: p, height: height) ?? graph.addNode(at: p, height: height)
         if let last = lastNode { graph.connect(last, id) }
         lastNode = id
-        recent.append(id)
-        if recent.count > recentWindow { recent.removeFirst() }
+        remember(id)
         return true
     }
 
@@ -180,7 +198,11 @@ public struct TrailRecorder: Sendable {
 
     /// Remember a sign read at p. Returns nil if the same sign is already known within `dedupeRadius`.
     @discardableResult
-    public mutating func markSign(_ text: String, at p: Vec2, height: Double? = nil, dedupeRadius: Double = 4) -> Int? {
+    ///
+    /// With `attachWithin`, the sign is put on an existing node within that distance of `p` (the
+    /// sign's own position, e.g. from a raycast) and no new path is invented; nil if none is near.
+    public mutating func markSign(_ text: String, at p: Vec2, height: Double? = nil, dedupeRadius: Double = 4,
+                                  attachWithin: Double? = nil) -> Int? {
         let key = PlaceMatcher.normalize(text)
         guard !key.isEmpty else { return nil }
         let known = graph.nodes.contains {
@@ -188,7 +210,13 @@ public struct TrailRecorder: Sendable {
                 && $0.position.distance(to: p) <= dedupeRadius
         }
         if known { return nil }
-        let id = spot(at: p, height: height)
+        let id: Int
+        if let radius = attachWithin {
+            guard let near = graph.nearestNode(to: p, height: height, within: radius) else { return nil }
+            id = near
+        } else {
+            id = spot(at: p, height: height)
+        }
         if let existing = graph.node(id).signText, existing != text {
             // One sign per node: put this one on a fresh node joined to it.
             let fresh = graph.addNode(at: p, height: height)
@@ -205,8 +233,15 @@ public struct TrailRecorder: Sendable {
         let id = graph.addNode(at: p, height: height)
         if let last = lastNode { graph.connect(last, id) }
         lastNode = id
-        recent.append(id)
+        remember(id)
         return id
+    }
+
+    /// Keep the recent-node window at its size (it used to grow by one per landmark or sign,
+    /// which slowly stopped loops from ever closing).
+    private mutating func remember(_ id: Int) {
+        recent.append(id)
+        while recent.count > recentWindow { recent.removeFirst() }
     }
 
     private func junction(near p: Vec2, height: Double?) -> Int? {

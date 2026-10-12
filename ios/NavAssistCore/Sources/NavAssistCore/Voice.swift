@@ -3,6 +3,7 @@ import Foundation
 /// What the user asked for, from one spoken sentence.
 public enum VoiceCommand: Equatable, Sendable {
     case save(String)          // "save this place as kitchen", "record location kitchen"
+    case saveWithoutName       // "save this place as" ... and then nothing usable
     case navigate(String)      // "take me to the kitchen", "navigate to room 204"
     case whereIs(String)       // "where is the exit"
     case whereAmI
@@ -37,6 +38,15 @@ public enum VoiceCommand: Equatable, Sendable {
             return nil
         }
 
+        // Stop wins whenever it leads the sentence ("stop", "stop stop", "stop guiding", "cancel the route").
+        let words = s.split(separator: " ").map(String.init)
+        let stopWords: Set<String> = ["stop", "cancel", "end", "quit", "halt", "the", "route", "navigation",
+                                      "navigating", "guiding", "guidance", "now", "it", "that"]
+        if let first = words.first, ["stop", "cancel", "halt", "quit"].contains(first),
+           words.allSatisfy({ stopWords.contains($0) }) || words.count <= 3 {
+            return .stop
+        }
+
         // Exact short commands first.
         switch s {
         case "stop", "cancel", "stop navigation", "stop navigating", "cancel route", "stop route", "end route":
@@ -69,7 +79,13 @@ public enum VoiceCommand: Equatable, Sendable {
             "this is (?:the |my )?",
             "i am at (?:the |my )?", "i'm at (?:the |my )?",
             "add (?:a )?(?:place|location|landmark)",
-        ]) { return .save(name) }
+        ]) { return isUsableName(name) ? .save(name) : .saveWithoutName }
+        if s.range(of: "^(?:save|record|remember|mark)\\b", options: .regularExpression) != nil,
+           s.split(separator: " ").count <= 5,
+           s.split(separator: " ").allSatisfy({ ["save", "record", "remember", "mark", "this", "the", "place", "location",
+                                                 "spot", "here", "as", "position"].contains(String($0)) }) {
+            return .saveWithoutName
+        }
 
         if let name = after([
             "where is (?:the |my )?", "where's (?:the |my )?", "how far is (?:the |my )?",
@@ -83,6 +99,12 @@ public enum VoiceCommand: Equatable, Sendable {
         ]) { return .navigate(name) }
 
         return .unknown(raw)
+    }
+
+    /// A spoken name must contain something besides filler ("save this place as" + pause gives "as").
+    static func isUsableName(_ name: String) -> Bool {
+        let filler: Set<String> = ["as", "here", "this", "place", "spot", "location", "the", "a", "it", "that", "um", "uh"]
+        return name.split(separator: " ").contains { !filler.contains(String($0)) }
     }
 
     private static func cleanName(_ s: String) -> String {
@@ -139,8 +161,10 @@ public enum PlaceMatcher {
         // Numbers must agree: "room 204" is not "room 205".
         let qNums = qt.filter { Int($0) != nil }, nNums = nt.filter { Int($0) != nil }
         if !qNums.isEmpty, !nNums.isEmpty, qNums.isDisjoint(with: nNums) { return 0 }
+        // Every spoken word is in the name ("exit" -> "Emergency Exit", "kitchen" -> "Kitchen 2"):
+        // a confident match, a little less the more extra words the name has.
         if qt.isSubset(of: nt) || nt.isSubset(of: qt) {
-            return 0.9 * Double(min(qt.count, nt.count)) / Double(max(qt.count, nt.count)) + 0.05
+            return 0.75 + 0.2 * Double(min(qt.count, nt.count)) / Double(max(qt.count, nt.count))
         }
         let jaccard = Double(qt.intersection(nt).count) / Double(qt.union(nt).count)
         let edit = 1 - Double(levenshtein(qs, ns)) / Double(max(qs.count, ns.count))

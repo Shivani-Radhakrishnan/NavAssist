@@ -131,7 +131,7 @@ func simulateTrip(_ style: WalkerStyle, adaptive: Bool, obeysCues: Bool = false)
 @Test func tripLogExportsCSV() throws {
     let r = simulateTrip(.turnsEarly(by: 4), adaptive: true)
     let lines = r.log.csv().split(separator: "\n")
-    #expect(lines.first?.hasPrefix("trip,participant,adaptive,destination,outcome,t,") == true)
+    #expect(lines.first?.hasPrefix("trip,participant,adaptive,destination,outcome,route,t,") == true)
     #expect(lines.first?.contains("f_speed") == true)
     #expect(lines.count == r.log.samples.count + 1)
     #expect(lines.contains { $0.hasSuffix("earlyTurn") || $0.contains("earlyTurn|") || $0.contains("|earlyTurn") })

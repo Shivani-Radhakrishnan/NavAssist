@@ -49,6 +49,18 @@ class Guide(
         }
     }
 
+    /** Height of each kept route point, so arrival and turns happen on the right floor. */
+    val routeHeights: List<Double?> = run {
+        if (heights == null || heights.size != route.size) List(this.route.size) { null }
+        else {
+            var used = 0
+            this.route.map { pt ->
+                while (used < route.size - 1 && route[used] != pt) used++
+                heights[minOf(used, heights.size - 1)]
+            }
+        }
+    }
+
     /** The map node being navigated to, so a new route can be planned after going off route. */
     var destinationNodeId: Int? = null
 
@@ -58,6 +70,7 @@ class Guide(
         private set
 
     private var offSince: Double? = null
+    private var currentHeight: Double? = null
     private var aligned = true
     private var lastHeadingPrompt = Double.NEGATIVE_INFINITY
     private val approachAnnounced = mutableSetOf<Int>()
@@ -94,12 +107,18 @@ class Guide(
         return out
     }
 
-    fun update(position: Vec2, heading: Vec2, time: Double): List<GuidanceEvent> {
+    /** Tracking was lost or paused: forget a half-measured "off route" time. */
+    fun pause() {
+        offSince = null
+    }
+
+    fun update(position: Vec2, heading: Vec2, time: Double, height: Double? = null): List<GuidanceEvent> {
         if (finished) return emptyList()
         val p = position
+        currentHeight = height
         val out = mutableListOf<GuidanceEvent>()
 
-        if (p.distanceTo(route.last()) <= settings.arriveRadius) {
+        if (p.distanceTo(route.last()) <= settings.arriveRadius && sameFloor(height, routeHeights.last())) {
             finished = true
             return listOf(GuidanceEvent.Haptic(HapticCue.ARRIVED),
                           GuidanceEvent.Speak("You have arrived at $destinationName.", true), GuidanceEvent.Arrived)
@@ -213,6 +232,7 @@ class Guide(
     }
 
     private fun reachedTarget(p: Vec2): Boolean {
+        if (!sameFloor(currentHeight, routeHeights[target])) return false
         if (p.distanceTo(route[target]) <= settings.waypointRadius) return true
         val (point, t) = closestPointOnSegment(p, route[target - 1], route[target])
         val next = distanceToSegment(p, route[target], route[target + 1])

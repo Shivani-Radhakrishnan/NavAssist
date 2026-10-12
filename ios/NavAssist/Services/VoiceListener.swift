@@ -45,9 +45,7 @@ final class VoiceListener {
         completion = done
         latest = ""
 
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .duckOthers])
-        try? session.setActive(true)
+        AudioSession.shared.use("listen", true)
 
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
@@ -65,7 +63,7 @@ final class VoiceListener {
         do {
             try engine.start()
         } catch {
-            finish()
+            finish(failure: .unavailable)
             return
         }
         isListening = true
@@ -78,19 +76,20 @@ final class VoiceListener {
                     self.latest = result.bestTranscription.formattedString
                     self.onPartial?(self.latest)
                     self.restartSilenceTimer()
-                    if result.isFinal { self.finish() }
+                    if result.isFinal { self.finish(failure: nil) }
                 } else if error != nil {
-                    self.finish()
+                    // Nothing recognised yet means the recogniser failed, not that the user was silent.
+                    self.finish(failure: self.latest.isEmpty ? .unavailable : nil)
                 }
             }
         }
         // Give up if nothing is said; never listen for more than 8 seconds.
-        silenceTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: false) { [weak self] _ in self?.finish() }
-        maxTimer = Timer.scheduledTimer(withTimeInterval: 8, repeats: false) { [weak self] _ in self?.finish() }
+        silenceTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: false) { [weak self] _ in self?.finish(failure: nil) }
+        maxTimer = Timer.scheduledTimer(withTimeInterval: 8, repeats: false) { [weak self] _ in self?.finish(failure: nil) }
     }
 
-    /// Stop listening now and use what was heard so far.
-    func finish() {
+    /// Stop listening now and use what was heard so far (or report a failure).
+    func finish(failure: Failure? = nil) {
         guard isListening || completion != nil else { return }
         silenceTimer?.invalidate()
         maxTimer?.invalidate()
@@ -102,15 +101,15 @@ final class VoiceListener {
         request = nil
         if isListening { AudioServicesPlaySystemSound(1114) }   // "done listening" tone
         isListening = false
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        AudioSession.shared.use("listen", false)
         let done = completion
         completion = nil
-        done?(.success(latest))
+        if let failure { done?(.failure(failure)) } else { done?(.success(latest)) }
     }
 
     private func restartSilenceTimer() {
         silenceTimer?.invalidate()
         // 1.3 s of quiet after some words = the user has finished the sentence.
-        silenceTimer = Timer.scheduledTimer(withTimeInterval: 1.3, repeats: false) { [weak self] _ in self?.finish() }
+        silenceTimer = Timer.scheduledTimer(withTimeInterval: 1.3, repeats: false) { [weak self] _ in self?.finish(failure: nil) }
     }
 }

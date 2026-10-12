@@ -38,6 +38,8 @@ public struct GuidanceSettings: Codable, Equatable, Sendable {
 /// "turn to N o'clock" corrections at most every few seconds.
 public struct Guide: Sendable {
     public let route: [Vec2]
+    /// Height of each route point (nil where unknown), so arrival and turns happen on the right floor.
+    public let routeHeights: [Double?]
     /// Flights of stairs (or single steps) along the route, from the recorded heights.
     public let stairs: [StairFlight]
     public let destinationName: String
@@ -48,6 +50,7 @@ public struct Guide: Sendable {
     public private(set) var finished = false
 
     private var offSince: Double?
+    private var currentHeight: Double?
     private var aligned = true
     private var lastHeadingPrompt = -Double.infinity
     private var approachAnnounced: Set<Int> = []
@@ -60,7 +63,18 @@ public struct Guide: Sendable {
                 settings: GuidanceSettings = GuidanceSettings()) {
         self.stairs = heights.map { findStairs(route: route, heights: $0) } ?? []
         let simple = removeShortLegs(simplifyRoute(route, tolerance: 0.35), minLength: 0.6)
-        self.route = simple.count >= 2 ? simple : (route.count == 1 ? [route[0], route[0]] : route)
+        let chosen = simple.count >= 2 ? simple : (route.count == 1 ? [route[0], route[0]] : route)
+        self.route = chosen
+        // Simplification keeps original points, so each kept point's height is the original one.
+        if let heights, heights.count == route.count {
+            var used = 0
+            self.routeHeights = chosen.map { pt in
+                while used < route.count - 1 && route[used] != pt { used += 1 }
+                return heights[min(used, heights.count - 1)]
+            }
+        } else {
+            self.routeHeights = Array(repeating: nil, count: chosen.count)
+        }
         self.destinationName = destinationName
         self.settings = settings
     }
@@ -99,12 +113,20 @@ public struct Guide: Sendable {
         return out
     }
 
-    public mutating func update(position p: Vec2, heading h: Vec2, time t: Double) -> [GuidanceEvent] {
+    /// Tracking was lost (or paused): forget any half-measured "off route" time, so the first
+    /// pose afterwards isn't instantly treated as having left the route.
+    public mutating func pause() {
+        offSince = nil
+    }
+
+    public mutating func update(position p: Vec2, heading h: Vec2, time t: Double, height: Double? = nil) -> [GuidanceEvent] {
         guard !finished else { return [] }
+        currentHeight = height
         var out: [GuidanceEvent] = []
 
-        // Arrived?
-        if p.distance(to: route[route.count - 1]) <= settings.arriveRadius {
+        // Arrived? (On the same floor: a bedroom directly above the kitchen isn't "arrived".)
+        if p.distance(to: route[route.count - 1]) <= settings.arriveRadius,
+           sameFloor(height, routeHeights[routeHeights.count - 1]) {
             finished = true
             return [.haptic(.arrived), .speak("You have arrived at \(destinationName).", urgent: true), .arrived]
         }
@@ -224,6 +246,7 @@ public struct Guide: Sendable {
     }
 
     private func reachedTarget(_ p: Vec2) -> Bool {
+        guard sameFloor(currentHeight, routeHeights[target]) else { return false }
         if p.distance(to: route[target]) <= settings.waypointRadius { return true }
         // Walked past the corner: the next leg is now closer than the current one.
         let cur = closestPointOnSegment(p, route[target - 1], route[target])

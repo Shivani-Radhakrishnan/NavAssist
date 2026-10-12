@@ -299,7 +299,7 @@ final class NeuralObstacleSource: ObstacleSource {
 
         // 3. Not enough tracked points (blank wall, dark room): relative depth only, ahead only.
         let upright = rotateClockwise(grid.data, width: gw, height: gh)
-        var reading = fallback.analyze(depth: upright.data, width: upright.width, height: upright.height)
+        var reading = fallback.analyze(depth: upright.data, width: upright.width, height: upright.height, time: ctx.timestamp)
         reading.danger[Zone.left.rawValue] = 0
         reading.danger[Zone.right.rawValue] = 0
         reading.hints = classifier.hints(for: reading, doorFromPlanes: ctx.doorAhead, stairs: nil)

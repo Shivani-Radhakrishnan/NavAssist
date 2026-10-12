@@ -29,12 +29,27 @@ struct PlaceStore {
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    func save(_ place: PlaceFile, map: ARWorldMap) throws {
+    /// Save routes, names and signs (small, fast; done whenever they change).
+    func saveGraph(_ place: PlaceFile) throws {
         let dir = folder(place.name)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let mapData = try NSKeyedArchiver.archivedData(withRootObject: map, requiringSecureCoding: true)
-        try mapData.write(to: dir.appendingPathComponent("world.armap"), options: .atomic)
         try place.encoded().write(to: dir.appendingPathComponent("place.json"), options: .atomic)
+    }
+
+    /// Archive an ARKit world map (several MB). Call off the main thread.
+    static func archive(_ map: ARWorldMap) throws -> Data {
+        try NSKeyedArchiver.archivedData(withRootObject: map, requiringSecureCoding: true)
+    }
+
+    /// Save an archived world map next to the place's routes.
+    func saveMap(_ data: Data, for place: PlaceFile) throws {
+        let dir = folder(place.name)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try data.write(to: dir.appendingPathComponent("world.armap"), options: .atomic)
+    }
+
+    func hasMap(for place: PlaceFile) -> Bool {
+        FileManager.default.fileExists(atPath: folder(place.name).appendingPathComponent("world.armap").path)
     }
 
     func loadMap(for place: PlaceFile) throws -> ARWorldMap {

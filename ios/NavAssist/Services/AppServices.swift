@@ -40,14 +40,19 @@ final class AppSettings {
 
     /// Whether the next trip gets predictive cues. In study mode trips alternate, and the
     /// starting condition alternates between participants (P1 starts with cues, P2 without...).
-    func nextTripIsAdaptive() -> Bool {
+    /// Counted per participant and only for trips that were actually saved, so a cancelled or
+    /// too-short trip can't make two saved trips in a row share a condition.
+    func adaptiveForNextTrip() -> Bool {
         guard studyMode else { return adaptiveCues }
-        // Counted per participant, so one person's odd number of trips can't flip the next person's order.
-        let key = "tripCounter." + participant
-        let count = defaults.integer(forKey: key)
+        let count = defaults.integer(forKey: "tripCounter." + participant)
         let digits = Int(participant.filter(\.isNumber)) ?? 1
-        defaults.set(count + 1, forKey: key)
         return (count + digits) % 2 == 1
+    }
+
+    /// A study trip was saved: the next one gets the other condition.
+    func recordSavedTrip() {
+        let key = "tripCounter." + participant
+        defaults.set(defaults.integer(forKey: key) + 1, forKey: key)
     }
 
     var phrasing: Phrasing { Phrasing(unit: unit, stepLength: stepLength) }
@@ -70,13 +75,12 @@ final class AppServices {
     let trips = TripStore()
     /// Last sentence spoken, shown as a caption for sighted helpers and low-vision users.
     private(set) var caption = ""
+    /// The place currently loaded, which Settings won't let you delete while it's in use.
+    var activePlaceName: String?
 
     init() {
         speaker.onSpeak = { [weak self] text in self?.caption = text }
         applySettings()
-        if !ARController.hasLiDAR {
-            DispatchQueue.global(qos: .utility).async { _ = NeuralObstacleSource.sharedModel }
-        }
     }
 
     func applySettings() {
@@ -85,10 +89,13 @@ final class AppServices {
         haptics.enabled = settings.haptics
     }
 
-    func handle(_ events: [GuidanceEvent]) {
+    /// Play events from the guide, the obstacle announcer or the coach. Speech priority comes
+    /// from the caller, or from the batch (a stop/obstacle vibration marks it as safety).
+    func handle(_ events: [GuidanceEvent], priority: SpeechPriority? = nil) {
+        let p = priority ?? events.impliedPriority
         for e in events {
             switch e {
-            case .speak(let text, let urgent): speaker.say(text, urgent: urgent)
+            case .speak(let text, let urgent): speaker.say(text, priority: p, urgent: urgent)
             case .haptic(let cue): haptics.play(cue)
             case .arrived, .offRoute: break
             }

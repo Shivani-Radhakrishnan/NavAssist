@@ -4,7 +4,7 @@
 with its tests. It runs on any JVM, so no Android SDK is needed:
 
 ```bash
-./gradlew :core:test        # 57 tests
+./gradlew :core:test        # 74 tests
 ```
 
 The Android app itself (ARCore, speech, haptics) isn't built yet. The plan, and how each

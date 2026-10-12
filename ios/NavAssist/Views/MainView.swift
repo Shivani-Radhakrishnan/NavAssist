@@ -70,7 +70,7 @@ struct MainView: View {
             n.start()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { nav?.saveNow() }
+            if phase == .background { nav?.enterBackground() }
         }
     }
 

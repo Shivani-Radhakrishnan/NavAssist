@@ -1,13 +1,40 @@
 import AVFoundation
+import NavAssistCore
 import UIKit
 
-/// Speaks guidance. Urgent messages (turns, "Stop") cut in immediately; others wait
-/// for the current sentence, and only the newest waiting one is kept so the app never
-/// falls behind reading out stale directions.
+/// One audio-session setup for the whole app. Speaking and listening both need it; switching
+/// categories between them used to cut the microphone off mid-command. The session is only
+/// active while something is speaking or listening, so other apps' audio returns to full
+/// volume in between.
+final class AudioSession {
+    static let shared = AudioSession()
+    private var users: Set<String> = []
+
+    private init() {
+        try? AVAudioSession.sharedInstance().setCategory(
+            .playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers, .allowBluetoothA2DP])
+    }
+
+    func use(_ who: String, _ on: Bool) {
+        let wasEmpty = users.isEmpty
+        if on { users.insert(who) } else { users.remove(who) }
+        if wasEmpty && !users.isEmpty {
+            try? AVAudioSession.sharedInstance().setActive(true)
+        } else if !wasEmpty && users.isEmpty {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+    }
+}
+
+/// Speaks guidance. What to say and when is decided by `SpeechArbiter` (NavAssistCore):
+/// safety beats directions beats information, nothing interrupts a safety warning in its first
+/// moments, waiting messages expire instead of piling up, and nothing is spoken while the user
+/// is giving a voice command.
 // Only used from the main thread; delegate callbacks hop back to main before touching state.
 final class Speaker: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
     private let synth = AVSpeechSynthesizer()
-    private var pending: String?
+    private var arbiter = SpeechArbiter()
+    private var currentUtterance: AVSpeechUtterance?
     var rate: Float = AVSpeechUtteranceDefaultSpeechRate
     /// Called with every sentence spoken, for the on-screen caption.
     var onSpeak: ((String) -> Void)?
@@ -15,23 +42,43 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable 
     override init() {
         super.init()
         synth.delegate = self
+        _ = AudioSession.shared
     }
 
-    func say(_ text: String, urgent: Bool = false) {
-        if urgent {
-            pending = nil
-            synth.stopSpeaking(at: .immediate)
+    private var now: Double { CACurrentMediaTime() }
+
+    func say(_ text: String, priority: SpeechPriority = .navigation, urgent: Bool = false) {
+        perform(arbiter.request(text, priority: priority, urgent: urgent, now: now))
+    }
+
+    /// The microphone is opening (true) or closed (false). Speech pauses while it's open.
+    func setListening(_ on: Bool) {
+        if on { silence() }
+        perform(arbiter.setListening(on, now: now))
+    }
+
+    func stop() {
+        arbiter.clear()
+        silence()
+        AudioSession.shared.use("speech", false)
+    }
+
+    private func perform(_ action: SpeechArbiter.Action) {
+        switch action {
+        case .none:
+            if !arbiter.isSpeaking { AudioSession.shared.use("speech", false) }
+        case .speak(let text):
             speakNow(text)
-        } else if synth.isSpeaking {
-            pending = text
-        } else {
+        case .interrupt(let text):
+            silence()
             speakNow(text)
         }
     }
 
-    func stop() {
-        pending = nil
-        synth.stopSpeaking(at: .immediate)
+    /// Stop the current sentence without treating it as finished (the arbiter already decided).
+    private func silence() {
+        currentUtterance = nil
+        if synth.isSpeaking { synth.stopSpeaking(at: .immediate) }
     }
 
     private func speakNow(_ text: String) {
@@ -39,32 +86,19 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable 
         let u = AVSpeechUtterance(string: text)
         u.rate = rate
         u.prefersAssistiveTechnologySettings = true   // use the user's VoiceOver voice if set
-        // Duck music/podcasts only while a sentence is being spoken. Set every time, because
-        // listening for a voice command switches the audio session to recording.
-        let audio = AVAudioSession.sharedInstance()
-        if audio.category != .playback {
-            try? audio.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
-        }
-        try? audio.setActive(true)
+        currentUtterance = u
+        AudioSession.shared.use("speech", true)
         synth.speak(u)
     }
 
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        DispatchQueue.main.async { [weak self] in self?.speakPendingOrRelease() }
-    }
-
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        DispatchQueue.main.async { [weak self] in self?.speakPendingOrRelease() }
-    }
-
-    private func speakPendingOrRelease() {
-        guard !synth.isSpeaking else { return }
-        if let next = pending {
-            pending = nil
-            speakNow(next)
-        } else {
-            // Let other apps' audio return to full volume.
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    private func ended(_ u: AVSpeechUtterance) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, u === self.currentUtterance else { return }   // a cancelled, replaced sentence
+            self.currentUtterance = nil
+            self.perform(self.arbiter.finished(now: self.now))
         }
     }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) { ended(utterance) }
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) { ended(utterance) }
 }

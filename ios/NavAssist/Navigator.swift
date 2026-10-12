@@ -6,7 +6,7 @@ import UIKit
 /// Everything the app does, on one screen:
 /// - recognises a place it has mapped before, or starts a new map, as soon as it opens;
 /// - maps continuously while the user walks, and saves automatically;
-/// - reads signs and remembers where they were;
+/// - reads signs and remembers where they are;
 /// - answers voice commands: save a place, navigate, where am I, what's around...;
 /// - warns about obstacles and stairs.
 @Observable
@@ -39,11 +39,26 @@ final class Navigator {
     @ObservationIgnored private var candidates: [PlaceFile] = []
     @ObservationIgnored private var attemptTimer: Timer?
     @ObservationIgnored private var saveTimer: Timer?
-    @ObservationIgnored private var dirty = false
-    @ObservationIgnored private var saving = false
+    @ObservationIgnored private var watchdogTimer: Timer?
     @ObservationIgnored private var lastSignSpoken = -Double.infinity
+    @ObservationIgnored private var recentlySpokenSigns: [String: Double] = [:]
     @ObservationIgnored private var lastTrackingSpeech = -Double.infinity
     @ObservationIgnored private var started = false
+
+    // Saving: the graph (small) is written whenever it changes; the ARKit world map (large) less
+    // often. Generation counters make sure a save that finishes late can't mark newer changes
+    // (say, a landmark saved a moment ago) as already saved.
+    @ObservationIgnored private var changeGen = 0
+    @ObservationIgnored private var savedGraphGen = 0
+    @ObservationIgnored private var savedMapGen = 0
+    @ObservationIgnored private var lastMapSave = -Double.infinity
+    @ObservationIgnored private var savingGraph = false
+    @ObservationIgnored private var savingMap = false
+    @ObservationIgnored private var graphSaveAgain = false
+
+    // Obstacle-warning watchdog.
+    @ObservationIgnored private var lastReading = 0.0
+    @ObservationIgnored private var warningsPausedSaid = false
 
     init(app: AppServices) {
         self.app = app
@@ -52,6 +67,7 @@ final class Navigator {
     var graph: RouteGraph { recorder.graph }
     private var ar: ARController { app.ar }
     private var trackingOK: Bool { ar.tracking.isNormal }
+    private var now: Double { CACurrentMediaTime() }
 
     // MARK: - Start up
 
@@ -62,7 +78,7 @@ final class Navigator {
 
         ar.onPose = { [weak self] p, h, height, t in self?.pose(p, h, height, t) }
         ar.onTrackingChange = { [weak self] state in self?.trackingChanged(state) }
-        signs.onSigns = { [weak self] texts, t in self?.sawSigns(texts, t) }
+        signs.onSigns = { [weak self] sightings, t in self?.sawSigns(sightings, t) }
         ar.signReader = signs
         voice.onPartial = { [weak self] text in self?.heard = text }
         startObstacles()
@@ -73,11 +89,15 @@ final class Navigator {
         } else {
             tryNextPlace()
         }
-        saveTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.saveNow() }
+        saveTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+            self?.saveGraph()
+            self?.saveMapIfDue()
+        }
+        watchdogTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.checkWarnings() }
 
         voice.requestPermission { [weak self] ok in
             if !ok {
-                self?.say("To use voice commands, allow the microphone and speech recognition for NavAssist in the Settings app.", urgent: false)
+                self?.say("To use voice commands, allow the microphone and speech recognition for NavAssist in the Settings app.")
             }
         }
     }
@@ -95,10 +115,7 @@ final class Navigator {
             tryNextPlace()
             return
         }
-        place = p
-        recorder = TrailRecorder(graph: p.graph)
-        placeName = p.name
-        revision += 1
+        load(p)
         mode = .recognizing(p.name)
         ar.start(worldMap: map)
         say("Checking if this is \(p.name). Hold the phone up and slowly turn around.", urgent: true)
@@ -113,11 +130,7 @@ final class Navigator {
         let taken = Set(app.store.list().map { PlaceFile.folderName(for: $0.name) })
         var n = 1
         while taken.contains(PlaceFile.folderName(for: "Place \(n)")) { n += 1 }
-        let name = "Place \(n)"
-        place = PlaceFile(name: name, graph: RouteGraph())
-        recorder = TrailRecorder()
-        placeName = name
-        revision += 1
+        load(PlaceFile(name: "Place \(n)", graph: RouteGraph()))
         mode = .mapping
         ar.start(worldMap: nil)
         if firstLaunch {
@@ -128,16 +141,37 @@ final class Navigator {
         }
     }
 
-    func stop() {
+    private func load(_ p: PlaceFile) {
+        place = p
+        recorder = TrailRecorder(graph: p.graph)
+        placeName = p.name
+        app.activePlaceName = p.name
+        changeGen = 0
+        savedGraphGen = 0
+        savedMapGen = 0
+        revision += 1
+    }
+
+    /// The app is going to the background: finish the trip log and save everything, with a
+    /// little background time from iOS so the save isn't cut short.
+    func enterBackground() {
+        final class TaskBox { var id = UIBackgroundTaskIdentifier.invalid }
+        let box = TaskBox()
+        let finish = {
+            guard box.id != .invalid else { return }
+            UIApplication.shared.endBackgroundTask(box.id)
+            box.id = .invalid
+        }
+        box.id = UIApplication.shared.beginBackgroundTask(withName: "Save NavAssist map") { finish() }
         endTrip(.abandoned)
-        saveNow()
-        UIApplication.shared.isIdleTimerDisabled = false
+        saveGraph()
+        saveMap(force: true) { finish() }
     }
 
     // MARK: - Tracking
 
     private func trackingChanged(_ state: ARController.Tracking) {
-        let t = CACurrentMediaTime()
+        let t = now
         switch state {
         case .normal:
             if case .recognizing(let name) = mode {
@@ -145,15 +179,16 @@ final class Navigator {
                 candidates = []
                 mode = .mapping
                 place?.lastUsed = Date()
-                dirty = true
+                markChanged()
                 app.haptics.play(.onTrack)
                 let known = graph.destinations.count
                 say("This is \(name). I know \(known) \(known == 1 ? "place" : "places") here. Tap and say where you want to go.", urgent: true)
             } else if case .guiding = mode, t - lastTrackingSpeech < 60 {
-                say("Tracking back.", urgent: false)
+                say("Tracking back.")
             }
         case .limited, .relocalizing:
             recorder.breakTrail()           // don't join the trail across a gap
+            guide?.pause()                  // and don't count the gap as time spent off route
             switch mode {
             case .mapping, .guiding:
                 if t - lastTrackingSpeech > 8 {
@@ -164,7 +199,7 @@ final class Navigator {
             case .recognizing:
                 if case .limited = state, t - lastTrackingSpeech > 8 {
                     lastTrackingSpeech = t
-                    say(state.spoken, urgent: false)
+                    say(state.spoken)
                 }
             case .starting:
                 break
@@ -178,24 +213,23 @@ final class Navigator {
         switch mode {
         case .mapping, .guiding:
             if recorder.add(p, height: height) {
-                dirty = true
+                markChanged()
                 revision += 1
             }
         default:
             return
         }
         guard case .guiding = mode, var g = guide else { return }
-        let events = g.update(position: p, heading: h, time: t)
+        let events = g.update(position: p, heading: h, time: t, height: height)
         guide = g
         app.handle(events)
 
         // Sensor signals -> predictor -> a cue if a hesitation or early turn looks likely.
-        // Route directions take priority: no cue on a tick where the guide is speaking.
+        // Cues are the lowest priority, so they never talk over directions or warnings.
         if !g.finished, var tr = trip {
             let cues = tr.record(NavSample.make(guide: g, position: p, heading: h, height: height, time: t))
             trip = tr
-            let guideSpoke = events.contains { if case .speak = $0 { return true } else { return false } }
-            if !guideSpoke, !listening { app.handle(cues) }
+            app.handle(cues, priority: .info)
         }
 
         if events.contains(.arrived) {
@@ -212,19 +246,38 @@ final class Navigator {
 
     // MARK: - Signs
 
-    private func sawSigns(_ texts: [String], _ t: TimeInterval) {
+    private func sawSigns(_ sightings: [SignReader.Sighting], _ t: TimeInterval) {
         guard trackingOK, mode == .mapping || isGuiding else { return }
-        var new: [String] = []
-        for text in texts where recorder.markSign(text, at: ar.position, height: ar.height) != nil {
-            new.append(text)
+        var announce: [String] = []
+        for s in sightings {
+            // Where is the sign? Cast the camera ray onto the walls ARKit has found.
+            var signPos: Vec2?
+            if let hit = raycast(s), simd_distance(hit, s.origin) < 12 {
+                signPos = Vec2(fromWorldX: hit.x, z: hit.z)
+            }
+            // Store it on the walked path next to the sign (never inventing a new path); if the
+            // sign is beside where the user stands, that spot works too.
+            let at = signPos ?? ar.position
+            if recorder.markSign(s.text, at: at, height: ar.height, attachWithin: signPos == nil ? 1.0 : 2.0) != nil {
+                markChanged()
+                revision += 1
+            }
+            if t - (recentlySpokenSigns[s.text] ?? -.infinity) > 60 {
+                recentlySpokenSigns[s.text] = t
+                announce.append(s.text)
+            }
         }
-        guard !new.isEmpty else { return }
-        dirty = true
-        revision += 1
-        if t - lastSignSpoken > 4, !listening {
+        if !announce.isEmpty, t - lastSignSpoken > 4 {
             lastSignSpoken = t
-            say("Sign: " + new.prefix(3).joined(separator: ", "), urgent: false)
+            say("Sign: " + announce.prefix(3).joined(separator: ", "), priority: .info)
         }
+    }
+
+    private func raycast(_ s: SignReader.Sighting) -> simd_float3? {
+        let query = ARRaycastQuery(origin: s.origin, direction: s.direction, allowing: .estimatedPlane, alignment: .any)
+        guard let hit = ar.session.raycast(query).first else { return nil }
+        let c = hit.worldTransform.columns.3
+        return SIMD3(c.x, c.y, c.z)
     }
 
     // MARK: - Voice
@@ -235,19 +288,20 @@ final class Navigator {
             voice.finish()
             return
         }
-        app.speaker.stop()
         heard = ""
         listening = true
+        app.speaker.setListening(true)        // speech waits; the microphone mustn't hear it
         voice.listen { [weak self] result in
             guard let self else { return }
             self.listening = false
+            self.app.speaker.setListening(false)
             switch result {
             case .success(let text): self.handle(text)
             case .failure(.notAllowed):
                 self.say("I need permission to use the microphone and speech recognition. "
                          + "Open the Settings app, find NavAssist, and allow both.", urgent: true)
             case .failure(.unavailable):
-                self.say("Speech recognition isn't available right now. Check the internet connection and try again.", urgent: true)
+                self.say("Speech recognition isn't working right now. Tap and try again in a moment.", urgent: true)
             }
         }
     }
@@ -260,6 +314,8 @@ final class Navigator {
         }
         switch VoiceCommand.parse(spoken) {
         case .save(let name): save(name)
+        case .saveWithoutName:
+            say("What should I call this place? Tap and say, for example: save this place as kitchen.", urgent: true)
         case .navigate(let name): navigate(to: name)
         case .whereIs(let name): describe(name)
         case .whereAmI: whereAmI()
@@ -279,12 +335,15 @@ final class Navigator {
             return
         }
         let name = raw.capitalized
+        let key = PlaceMatcher.normalize(name)
+        let existed = graph.landmarks.contains { PlaceMatcher.normalize($0.landmark ?? "") == key }
         recorder.markLandmark(name, at: ar.position, height: ar.height)
-        dirty = true
+        markChanged()
         revision += 1
         app.haptics.play(.waypoint)
-        say("Saved \(name).", urgent: true)
-        saveNow()
+        say(existed ? "Moved \(name) here." : "Saved \(name).", urgent: true)
+        saveGraph()
+        saveMap(force: true)
     }
 
     private func navigate(to query: String) {
@@ -302,18 +361,13 @@ final class Navigator {
     private func plan(to dest: RouteGraph.Node, announceStart: Bool) {
         let here = ar.position
         let name = dest.spokenName ?? "there"
-        guard let start = graph.nearestNode(to: here, height: ar.height, within: 3) else {
-            guide = nil
-            mode = .mapping
-            endTrip(.abandoned)
-            say("You're more than 3 meters from anywhere I've mapped. Walk back toward where you've been.", urgent: true)
+        guard graph.nearestNode(to: here, height: ar.height, within: 3) != nil else {
+            abandonRoute("You're more than 3 meters from anywhere I've mapped. Walk back toward where you've been.")
             return
         }
-        guard let path = graph.shortestPath(from: start, to: dest.id) else {
-            guide = nil
-            mode = .mapping
-            endTrip(.abandoned)
-            say("I haven't mapped a way from here to \(name) yet. Once you've walked there with the app open, I can guide you.", urgent: true)
+        // Start from a node that actually connects (preferring the one just walked from).
+        guard let path = graph.route(from: here, height: ar.height, to: dest.id, preferred: recorder.lastNode) else {
+            abandonRoute("I haven't mapped a way from here to \(name) yet. Once you've walked there with the app open, I can guide you.")
             return
         }
         var route = graph.positions(of: path)
@@ -324,20 +378,29 @@ final class Navigator {
         }
         var g = Guide(route: route, heights: heights, destinationName: name, settings: app.settings.guidance)
         g.destinationNodeID = dest.id
-        if announceStart || trip == nil {          // a re-plan after going off route stays the same trip
+        if announceStart || trip == nil {
             endTrip(.abandoned)
             var tr = TripRecorder(participant: app.settings.participant, destination: name,
-                                  adaptive: app.settings.nextTripIsAdaptive(),
+                                  adaptive: app.settings.adaptiveForNextTrip(),
                                   routeLength: g.remainingDistance(from: here), predictor: predictor)
             tr.coach.phrasing = app.settings.phrasing
             trip = tr
+        } else {
+            trip?.newRoute()               // same trip, new route after going off route
         }
-        let events = g.start(position: here, heading: ar.heading, time: CACurrentMediaTime())
+        let events = g.start(position: here, heading: ar.heading, time: now)
         guide = g
         mode = .guiding(name)
         app.handle(announceStart ? events : events.filter {
             if case .speak(let s, _) = $0 { return !s.hasPrefix("Route to") } else { return true }
         })
+    }
+
+    private func abandonRoute(_ message: String) {
+        guide = nil
+        mode = .mapping
+        endTrip(.abandoned)
+        say(message, urgent: true)
     }
 
     private func describe(_ query: String) {
@@ -374,10 +437,11 @@ final class Navigator {
 
     private func stopRoute() {
         guard isGuiding else { say("There's no route to stop.", urgent: true); return }
-        trip?.note(.stopped, at: CACurrentMediaTime())
+        trip?.note(.stopped, at: now)
         endTrip(.stopped)
         guide = nil
         mode = .mapping
+        app.speaker.stop()
         say("Stopped.", urgent: true)
     }
 
@@ -403,12 +467,17 @@ final class Navigator {
         guard var tr = trip else { return }
         trip = nil
         let log = tr.finish(outcome)
-        if log.samples.count >= 10 { app.trips.save(log) }
+        if log.samples.count >= 10 {
+            app.trips.save(log)
+            app.settings.recordSavedTrip()
+        }
     }
 
     private var isGuiding: Bool { if case .guiding = mode { return true } else { return false } }
 
-    private func say(_ text: String, urgent: Bool) { app.speaker.say(text, urgent: urgent) }
+    private func say(_ text: String, priority: SpeechPriority = .navigation, urgent: Bool = false) {
+        app.speaker.say(text, priority: priority, urgent: urgent)
+    }
 
     private func nearby(within r: Double) -> [RouteGraph.Node] {
         let here = ar.position
@@ -429,7 +498,7 @@ final class Navigator {
         if straight < 1 { return "right here" }
         let clock = clockDirection(signedAngle(from: ar.heading, to: n.position - here))
         var walking = straight
-        if let s = graph.nearestNode(to: here, height: ar.height, within: 3), let path = graph.shortestPath(from: s, to: n.id) {
+        if let path = graph.route(from: here, height: ar.height, to: n.id, preferred: recorder.lastNode) {
             let pts = graph.positions(of: path)
             walking = zip(pts, pts.dropFirst()).reduce(here.distance(to: pts[0])) { $0 + $1.0.distance(to: $1.1) }
         }
@@ -452,41 +521,109 @@ final class Navigator {
         return parts.joined(separator: " ")
     }
 
+    // MARK: - Obstacles
+
     private func startObstacles() {
-        let (source, problem) = ObstacleSources.best(warnDistance: app.settings.warnDistance)
-        announcer.phrasing = app.settings.phrasing
-        source?.onReading = { [weak self] reading, t in
-            guard let self, self.app.settings.obstacleWarnings else { return }
-            let events = self.announcer.update(reading, time: t)
-            // Don't talk over the user while they're giving a command; vibrate instead.
-            self.app.handle(self.listening ? events.filter { if case .haptic = $0 { return true } else { return false } } : events)
-        }
-        ar.obstacleSource = source
-        if let problem, app.settings.obstacleWarnings {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in self?.say(problem, urgent: false) }
+        let warn = app.settings.warnDistance
+        // Loading the ~50 MB depth model on the main thread would delay the welcome message.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let (source, problem) = ObstacleSources.best(warnDistance: warn)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                source?.onReading = { [weak self] reading, t in self?.obstacleReading(reading, t) }
+                self.ar.obstacleSource = source
+                if let problem, self.app.settings.obstacleWarnings {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in self?.say(problem) }
+                }
+            }
         }
     }
 
-    /// Save the map and routes now (also runs every 30 seconds and when the app is closed).
-    func saveNow() {
-        guard var p = place, dirty, !saving, graph.nodes.count >= 2 else { return }
-        switch ar.mapping {
-        case .extending, .mapped: break
-        default: return           // ARKit can't produce a usable map yet
+    private func obstacleReading(_ reading: ZoneReading, _ t: TimeInterval) {
+        lastReading = now
+        if warningsPausedSaid {
+            warningsPausedSaid = false
+            say("Obstacle warnings are back.")
         }
-        saving = true
+        guard app.settings.obstacleWarnings else { return }
+        announcer.phrasing = app.settings.phrasing      // follow Settings changes live
+        let events = announcer.update(reading, time: t)
+        // Warnings that come with a stop/obstacle vibration (and anything urgent) are safety.
+        let urgent = events.contains { if case .speak(_, let u) = $0 { return u } else { return false } }
+        app.handle(events, priority: urgent ? .safety : events.impliedPriority)
+    }
+
+    /// If obstacle readings stop arriving (camera interrupted, the model failed), say so once
+    /// instead of silently leaving the user without warnings.
+    private func checkWarnings() {
+        guard app.settings.obstacleWarnings, ar.obstacleSource != nil, lastReading > 0 else { return }
+        switch ar.tracking {
+        case .stopped, .starting: return
+        default: break
+        }
+        if now - lastReading > 2.0, !warningsPausedSaid {
+            warningsPausedSaid = true
+            app.haptics.play(.offRoute)
+            say("Obstacle warnings paused. Walk slowly.", priority: .safety, urgent: true)
+        }
+    }
+
+    // MARK: - Saving
+
+    private func markChanged() { changeGen += 1 }
+
+    /// Worth keeping on disk: a new place isn't saved until it has a name, a sign, or about 20 m
+    /// of walked path (otherwise every failed recognition left an empty "Place N" behind).
+    private var worthSaving: Bool {
+        !graph.destinations.isEmpty || graph.nodes.count >= 40 || (place.map(app.store.hasMap) ?? false)
+    }
+
+    /// Save routes, names and signs. Small and quick, so it runs whenever they change.
+    func saveGraph() {
+        guard var p = place, changeGen != savedGraphGen, worthSaving else { return }
+        if savingGraph { graphSaveAgain = true; return }
+        savingGraph = true
+        let gen = changeGen
         p.graph = recorder.graph
         p.lastUsed = Date()
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            defer { self.saving = false }
-            do {
-                let map = try await self.ar.currentWorldMap()
-                try self.app.store.save(p, map: map)
-                self.place = p
-                self.dirty = false
-            } catch {
-                // Try again on the next timer tick.
+        let store = app.store
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let ok = (try? store.saveGraph(p)) != nil
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.savingGraph = false
+                if ok { self.savedGraphGen = max(self.savedGraphGen, gen) }
+                if self.graphSaveAgain { self.graphSaveAgain = false; self.saveGraph() }
+            }
+        }
+    }
+
+    private func saveMapIfDue() {
+        if now - lastMapSave > 120 { saveMap(force: false) }
+    }
+
+    /// Save the ARKit world map (several MB), archived off the main thread.
+    func saveMap(force: Bool, completion: (() -> Void)? = nil) {
+        guard let p = place, worthSaving, !savingMap, force || changeGen != savedMapGen else { completion?(); return }
+        switch ar.mapping {
+        case .extending, .mapped: break
+        default: completion?(); return           // ARKit can't produce a usable map yet
+        }
+        savingMap = true
+        let gen = changeGen
+        let store = app.store
+        ar.session.getCurrentWorldMap { [weak self] map, _ in
+            DispatchQueue.global(qos: .utility).async {
+                let ok = map.flatMap { try? PlaceStore.archive($0) }.map { (try? store.saveMap($0, for: p)) != nil } ?? false
+                DispatchQueue.main.async {
+                    guard let self else { completion?(); return }
+                    self.savingMap = false
+                    if ok {
+                        self.savedMapGen = max(self.savedMapGen, gen)
+                        self.lastMapSave = self.now
+                    }
+                    completion?()
+                }
             }
         }
     }

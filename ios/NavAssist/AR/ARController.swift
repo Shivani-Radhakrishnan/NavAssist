@@ -96,12 +96,23 @@ final class ARController: NSObject, ARSessionDelegate {
             position = Vec2(fromWorldX: t.columns.3.x, z: t.columns.3.z)
             heading = h
             height = Double(t.columns.3.y)
-            updateFloor(frame, cameraY: t.columns.3.y)
-            if tracking.isNormal { onPose?(position, heading, height, frame.timestamp) }
+            if tracking.isNormal {
+                floorY = Self.floor(under: t, in: frame)
+                onPose?(position, heading, height, frame.timestamp)
+            }
         }
-        guard tracking.isNormal else { return }
-        obstacleSource?.process(frame: frame, floorY: floorY ?? (t.columns.3.y - 1.35), heading: h)
-        signReader?.process(frame: frame)
+        // Obstacle warnings keep running while tracking is limited (a blank wall up close, a quick
+        // turn, relocalising after a call): depth relative to the camera is still valid then, so
+        // only the floor height falls back to an estimate.
+        switch tracking {
+        case .stopped, .starting:
+            return
+        case .normal:
+            obstacleSource?.process(frame: frame, floorY: floorY ?? (t.columns.3.y - 1.35), heading: h)
+            signReader?.process(frame: frame)
+        case .limited, .relocalizing:
+            obstacleSource?.process(frame: frame, floorY: t.columns.3.y - 1.35, heading: h)
+        }
     }
 
     func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {
@@ -154,13 +165,27 @@ final class ARController: NSObject, ARSessionDelegate {
         onTrackingChange?(new)
     }
 
-    /// The floor is the lowest horizontal plane at least 50 cm below the phone.
-    private func updateFloor(_ frame: ARFrame, cameraY: Float) {
-        let planes = frame.anchors.compactMap { $0 as? ARPlaneAnchor }
-            .filter { $0.alignment == .horizontal }
-            .map { $0.transform.columns.3.y }
-            .filter { $0 < cameraY - 0.5 }
-        if let lowest = planes.min() { floorY = lowest }
+    /// The floor under the user: a horizontal plane 0.9–2 m below the phone. Prefer one whose
+    /// extent contains the phone's position, then one ARKit classified as floor, then the highest.
+    /// (Taking the lowest plane anywhere used to pick the ground floor after going upstairs, and
+    /// every obstacle on the upper floor was then filtered out as "above head height".)
+    static func floor(under camera: simd_float4x4, in frame: ARFrame) -> Float? {
+        let cam = camera.columns.3
+        var best: (y: Float, score: Int)?
+        for case let plane as ARPlaneAnchor in frame.anchors where plane.alignment == .horizontal {
+            let y = plane.transform.columns.3.y
+            let drop = cam.y - y
+            guard drop >= 0.9, drop <= 2.0 else { continue }
+            let local = plane.transform.inverse * SIMD4<Float>(cam.x, y, cam.z, 1)
+            let ext = plane.planeExtent
+            let under = abs(local.x - plane.center.x) <= ext.width / 2 + 0.3
+                && abs(local.z - plane.center.z) <= ext.height / 2 + 0.3
+            var isFloor = false
+            if case .floor = plane.classification { isFloor = true }
+            let score = (under ? 2 : 0) + (isFloor ? 1 : 0)
+            if best == nil || score > best!.score || (score == best!.score && y > best!.y) { best = (y, score) }
+        }
+        return best?.y
     }
 
     /// Direction the user faces, on the floor plane. Normally the camera's view direction

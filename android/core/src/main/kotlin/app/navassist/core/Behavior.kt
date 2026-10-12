@@ -28,6 +28,8 @@ data class NavSample(
     val relToNextLeg: Double,
     /** Sideways offset from the current leg, positive toward the side of the upcoming turn. */
     val lateralTowardTurn: Double,
+    /** Which route of the trip (0, then 1, 2... after each re-plan): target indices restart per route. */
+    val route: Int = 0,
 ) {
     companion object {
         fun make(guide: Guide, position: Vec2, heading: Vec2, height: Double, time: Double): NavSample {
@@ -186,6 +188,8 @@ class AdaptiveCoach(var threshold: Double = 0.6, var phrasing: Phrasing = Phrasi
     private val earlyCuesForTarget = mutableMapOf<Int, Int>()
     private var lastEarlyCue = Double.NEGATIVE_INFINITY
 
+    internal fun resetForNewRoute() = earlyCuesForTarget.clear()
+
     fun update(s: NavSample, hesitation: Double, earlyTurn: Double): List<GuidanceEvent> {
         if (earlyTurn >= threshold && abs(s.upcomingTurn) >= 20 && s.distToTarget > 1.5 &&
             (earlyCuesForTarget[s.target] ?: 0) < 2 && s.t - lastEarlyCue >= 4) {
@@ -268,18 +272,22 @@ data class TripLog(
     fun csv(): String {
         val f = { v: Double -> String.format(Locale.US, "%.3f", v) }
         val featureCols = BehaviorFeatures.names.joinToString(",") { "f_$it" }
-        val rows = mutableListOf("trip,participant,adaptive,destination,outcome,t,x,y,height,heading,target,dist_to_target," +
+        val rows = mutableListOf("trip,participant,adaptive,destination,outcome,route,t,x,y,height,heading,target,dist_to_target," +
             "dist_to_destination,dist_to_route,rel_to_target,upcoming_turn,rel_to_next_leg,lateral_toward_turn,$featureCols,event")
         val t0 = samples.firstOrNull()?.t ?: 0.0
         val pending = ArrayDeque(events.sortedBy { it.t })
         val fx = FeatureExtractor()
         val blank = BehaviorFeatures.names.joinToString(",") { "" }
-        val dest = destination.replace(",", " ")
+        val clean = { s: String -> s.replace(",", " ").replace("\n", " ") }
+        val dest = clean(destination)
+        val who = clean(participant)
+        var route = samples.firstOrNull()?.route ?: 0
         for (s in samples) {
+            if (s.route != route) { fx.reset(); route = s.route }
             val feats = fx.add(s)?.values?.joinToString(",") { String.format(Locale.US, "%.4f", it) } ?: blank
             val ev = mutableListOf<String>()
             while (pending.isNotEmpty() && pending.first().t <= s.t) ev += pending.removeFirst().kind.id
-            rows += listOf(id, participant, if (adaptive) "1" else "0", dest, outcome.id, f(s.t - t0), f(s.x), f(s.y), f(s.height),
+            rows += listOf(id, who, if (adaptive) "1" else "0", dest, outcome.id, "${s.route}", f(s.t - t0), f(s.x), f(s.y), f(s.height),
                 f(s.heading), "${s.target}", f(s.distToTarget), f(s.distToDestination), f(s.distToRoute), f(s.relToTarget),
                 f(s.upcomingTurn), f(s.relToNextLeg), f(s.lateralTowardTurn), feats, ev.joinToString("|")).joinToString(",")
         }
@@ -298,12 +306,22 @@ class TripRecorder(
 ) {
     val log = TripLog(UUID.randomUUID().toString().uppercase(), participant, destination, adaptive, routeLength, TripLog.Outcome.ABANDONED)
     private val features = FeatureExtractor()
-    private val detector = BehaviorDetector()
+    private var detector = BehaviorDetector()
+    private var routeIndex = 0
+
+    /** A new route in the same trip (after going off route): per-corner state starts afresh. */
+    fun newRoute() {
+        routeIndex++
+        features.reset()
+        detector = BehaviorDetector()
+        coach.resetForNewRoute()
+    }
     var lastPrediction: Pair<Double, Double> = 0.0 to 0.0
         private set
 
     /** Record one sample. Returns the coach's cues (empty when cues are off). */
-    fun record(s: NavSample): List<GuidanceEvent> {
+    fun record(sample: NavSample): List<GuidanceEvent> {
+        val s = sample.copy(route = routeIndex)
         log.samples += s
         log.events += detector.add(s)
         val f = features.add(s) ?: return emptyList()

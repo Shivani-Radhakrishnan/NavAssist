@@ -8,7 +8,7 @@ What has been measured so far, how, and what hasn't been measured yet.
 cd ios/NavAssistCore && swift test
 ```
 
-There are 59 tests (79 checks, counting each voice phrasing separately). They also run on
+There are 77 tests. They also run on
 every push via GitHub Actions.
 
 | Area | What's checked |

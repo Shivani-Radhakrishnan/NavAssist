@@ -117,7 +117,7 @@ class BehaviorTest {
     @Test fun tripLogExportsTheSameCsvColumnsAsIos() {
         val r = simulateTrip(Style.TurnsEarly(4.0), adaptive = true)
         val lines = r.log.csv().trimEnd().split("\n")
-        assertTrue(lines.first().startsWith("trip,participant,adaptive,destination,outcome,t,"))
+        assertTrue(lines.first().startsWith("trip,participant,adaptive,destination,outcome,route,t,"))
         assertTrue(lines.first().contains("f_speed"))
         assertEquals(r.log.samples.size + 1, lines.size)
         assertTrue(lines.any { it.endsWith("earlyTurn") || it.contains("earlyTurn|") || it.contains("|earlyTurn") })

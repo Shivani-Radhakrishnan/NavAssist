@@ -29,6 +29,9 @@ public struct NavSample: Codable, Equatable, Sendable {
     public var relToNextLeg: Double
     /// Sideways offset from the current leg, positive toward the side of the upcoming turn.
     public var lateralTowardTurn: Double
+    /// Which route of the trip this sample belongs to (0, then 1, 2... after each re-plan),
+    /// because `target` indices restart on every new route.
+    public var route: Int = 0
 
     /// Build a sample from the guide's view of the route.
     public static func make(guide: Guide, position p: Vec2, heading h: Vec2, height: Double, time t: Double) -> NavSample {
@@ -208,6 +211,10 @@ public struct AdaptiveCoach: Sendable {
 
     public init() {}
 
+    mutating func resetForNewRoute() {
+        earlyCuesForTarget = [:]
+    }
+
     public mutating func update(sample s: NavSample, hesitation pH: Double, earlyTurn pE: Double) -> [GuidanceEvent] {
         // About to turn too soon: hold them on the current leg.
         if pE >= threshold, abs(s.upcomingTurn) >= 20, s.distToTarget > 1.5,
@@ -327,14 +334,18 @@ public struct TripLog: Codable, Equatable, Sendable {
     /// One row per sample, for spreadsheets and the Python analysis scripts.
     public func csv() -> String {
         let featureCols = BehaviorFeatures.names.map { "f_" + $0 }.joined(separator: ",")
-        var rows = ["trip,participant,adaptive,destination,outcome,t,x,y,height,heading,target,dist_to_target,dist_to_destination,"
+        var rows = ["trip,participant,adaptive,destination,outcome,route,t,x,y,height,heading,target,dist_to_target,dist_to_destination,"
                     + "dist_to_route,rel_to_target,upcoming_turn,rel_to_next_leg,lateral_toward_turn,\(featureCols),event"]
         let t0 = samples.first?.t ?? 0
         var pending = events.sorted { $0.t < $1.t }
         var fx = FeatureExtractor()
         let blank = BehaviorFeatures.names.map { _ in "" }.joined(separator: ",")
-        let dest = destination.replacingOccurrences(of: ",", with: " ")
+        let clean = { (s: String) in s.replacingOccurrences(of: ",", with: " ").replacingOccurrences(of: "\n", with: " ") }
+        let dest = clean(destination)
+        let who = clean(participant)
+        var route = samples.first?.route ?? 0
         for s in samples {
+            if s.route != route { fx.reset(); route = s.route }
             let feats = fx.add(s).map { $0.values.map { String(format: "%.4f", $0) }.joined(separator: ",") } ?? blank
             var ev: [String] = []
             while let e = pending.first, e.t <= s.t {
@@ -342,7 +353,7 @@ public struct TripLog: Codable, Equatable, Sendable {
                 pending.removeFirst()
             }
             let f = { (v: Double) in String(format: "%.3f", v) }
-            rows.append([id.uuidString, participant, adaptive ? "1" : "0", dest, outcome.rawValue, f(s.t - t0),
+            rows.append([id.uuidString, who, adaptive ? "1" : "0", dest, outcome.rawValue, "\(s.route)", f(s.t - t0),
                          f(s.x), f(s.y), f(s.height), f(s.heading), "\(s.target)", f(s.distToTarget),
                          f(s.distToDestination), f(s.distToRoute), f(s.relToTarget), f(s.upcomingTurn),
                          f(s.relToNextLeg), f(s.lateralTowardTurn), feats, ev.joined(separator: "|")].joined(separator: ","))
@@ -367,8 +378,21 @@ public struct TripRecorder: Sendable {
         self.predictor = predictor
     }
 
+    private var routeIndex = 0
+
+    /// A new route was planned in the same trip (after going off route): route-point indices
+    /// restart, so per-corner state in the detector, coach and features starts afresh.
+    public mutating func newRoute() {
+        routeIndex += 1
+        features.reset()
+        detector = BehaviorDetector()
+        coach.resetForNewRoute()
+    }
+
     /// Record one sample. Returns the coach's cues (empty when adaptive cues are off).
-    public mutating func record(_ s: NavSample) -> [GuidanceEvent] {
+    public mutating func record(_ sample: NavSample) -> [GuidanceEvent] {
+        var s = sample
+        s.route = routeIndex
         log.samples.append(s)
         log.events += detector.add(s)
         guard let f = features.add(s) else { return [] }
@@ -391,6 +415,10 @@ public struct TripRecorder: Sendable {
     /// Features for every sample of a finished trip, for training.
     public static func featureRows(_ log: TripLog) -> [(t: Double, features: [Double])] {
         var fx = FeatureExtractor()
-        return log.samples.compactMap { s in fx.add(s).map { (s.t, $0.values) } }
+        var route = log.samples.first?.route ?? 0
+        return log.samples.compactMap { s in
+            if s.route != route { fx.reset(); route = s.route }
+            return fx.add(s).map { (s.t, $0.values) }
+        }
     }
 }

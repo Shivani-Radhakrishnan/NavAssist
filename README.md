@@ -31,7 +31,7 @@ tap anywhere and speak.
 
 The navigation logic (route graph, routing, guidance, stairs, voice command parsing, place
 matching, obstacle zones, behaviour prediction, trip logs) is a platform-independent Swift
-package, `NavAssistCore`, with 59 tests that run on a Mac without an iPhone.
+package, `NavAssistCore`, with 77 tests that run on a Mac without an iPhone.
 
 ## Repository layout
 
@@ -57,8 +57,8 @@ prototype/                  the original Python prototype on the TUM RGB-D datas
 Run the tests (Swift on a Mac; Kotlin on any machine with Java 21):
 
 ```bash
-cd ios/NavAssistCore && swift test      # 59 tests
-cd android && ./gradlew :core:test      # 57 tests, Kotlin port
+cd ios/NavAssistCore && swift test      # 77 tests
+cd android && ./gradlew :core:test      # 74 tests, Kotlin port
 ```
 
 To run the app on an iPhone, see **[docs/setup.md](docs/setup.md)**. You need Xcode 16 or
@@ -95,7 +95,7 @@ relative-depth method. That method was what flagged a basket beside the path as 
 (AUC 0.83, about 2 s lead), but at ≤ 1 false alarm per minute it catches only 13% of them.
 That is why the next step is training on real trip logs.
 
-**Tests.** 59 Swift tests and 57 Kotlin tests run on every push. See [docs/evaluation.md](docs/evaluation.md).
+**Tests.** 77 Swift tests and 74 Kotlin tests run on every push. See [docs/evaluation.md](docs/evaluation.md).
 
 ## Research study tools
 
@@ -106,7 +106,7 @@ the predictor. See **[docs/research-study.md](docs/research-study.md)**.
 ## Status and limitations
 
 NavAssist runs on iPhone and iPad (portrait). For Android, the navigation logic is already
-ported to Kotlin (`android/core`, 57 tests). The ARCore app layer is planned, and
+ported to Kotlin (`android/core`, 74 tests). The ARCore app layer is planned, and
 [docs/android.md](docs/android.md) has the plan and how each feature maps to Android.
 
 - Routes exist only where someone has walked with the app open.

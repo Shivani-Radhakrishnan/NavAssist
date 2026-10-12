@@ -6,6 +6,7 @@ import kotlin.math.min
 /** What the user asked for, from one spoken sentence. */
 sealed interface VoiceCommand {
     data class Save(val name: String) : VoiceCommand          // "save this place as kitchen"
+    data object SaveWithoutName : VoiceCommand                // "save this place as" and then nothing usable
     data class Navigate(val name: String) : VoiceCommand      // "take me to the kitchen"
     data class WhereIs(val name: String) : VoiceCommand       // "where is the exit"
     data object WhereAmI : VoiceCommand
@@ -67,6 +68,12 @@ sealed interface VoiceCommand {
                 return null
             }
 
+            // Stop wins whenever it leads the sentence ("stop stop", "stop guiding", "cancel the route").
+            val words = s.split(" ")
+            val stopWords = setOf("stop", "cancel", "end", "quit", "halt", "the", "route", "navigation",
+                                  "navigating", "guiding", "guidance", "now", "it", "that")
+            if (words.first() in setOf("stop", "cancel", "halt", "quit") && (words.all { it in stopWords } || words.size <= 3)) return Stop
+
             when (s) {
                 in stopPhrases -> return Stop
                 in repeatPhrases -> return RepeatLast
@@ -75,10 +82,20 @@ sealed interface VoiceCommand {
                 in listPhrases -> return ListPlaces
                 in helpPhrases -> return Help
             }
-            after(savePatterns)?.let { return Save(it) }
+            after(savePatterns)?.let { return if (isUsableName(it)) Save(it) else SaveWithoutName }
+            val saveFiller = setOf("save", "record", "remember", "mark", "this", "the", "place", "location", "spot", "here", "as", "position")
+            if (Regex("^(?:save|record|remember|mark)\\b").containsMatchIn(s) && words.size <= 5 && words.all { it in saveFiller }) {
+                return SaveWithoutName
+            }
             after(wherePatterns)?.let { return WhereIs(it) }
             after(navigatePatterns)?.let { return Navigate(it) }
             return Unknown(raw)
+        }
+
+        /** A spoken name must contain something besides filler ("save this place as" + pause gives "as"). */
+        internal fun isUsableName(name: String): Boolean {
+            val filler = setOf("as", "here", "this", "place", "spot", "location", "the", "a", "it", "that", "um", "uh")
+            return name.split(" ").any { it.isNotEmpty() && it !in filler }
         }
 
         private fun cleanName(s: String): String {
@@ -134,8 +151,9 @@ object PlaceMatcher {
         val qNums = qt.filter(::isInt).toSet()
         val nNums = nt.filter(::isInt).toSet()
         if (qNums.isNotEmpty() && nNums.isNotEmpty() && qNums.intersect(nNums).isEmpty()) return 0.0
+        // Every spoken word is in the name ("exit" -> "Emergency Exit"): a confident match.
         if (nt.containsAll(qt) || qt.containsAll(nt)) {
-            return 0.9 * min(qt.size, nt.size).toDouble() / max(qt.size, nt.size) + 0.05
+            return 0.75 + 0.2 * min(qt.size, nt.size).toDouble() / max(qt.size, nt.size)
         }
         val jaccard = qt.intersect(nt).size.toDouble() / qt.union(nt).size
         val edit = 1 - levenshtein(qs, ns).toDouble() / max(qs.length, ns.length)

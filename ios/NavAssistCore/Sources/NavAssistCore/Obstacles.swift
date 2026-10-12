@@ -102,17 +102,37 @@ public struct RelativeDepthZoneAnalyzer: Sendable {
     public var warnRatio = 1.5
 
     private var floorRef: Double?
+    private var lastTime: Double?
+    private var atFeetFrames = 0
+    /// "Something at your feet" this many frames in a row with nothing else confirming it means
+    /// the ruler itself is wrong (e.g. it was set from an unusual frame), so it is re-seeded.
+    public var maxAtFeetFrames = 10
 
     public init() {}
 
     /// `depth` is row-major, `width` x `height`, already rotated upright, bigger = closer.
-    public mutating func analyze(depth: [Float], width: Int, height: Int) -> ZoneReading {
+    /// Pass `time` (seconds) when frames can be far apart: a ruler older than 1 s is dropped,
+    /// because the network's scale changes from frame to frame.
+    public mutating func analyze(depth: [Float], width: Int, height: Int, time: Double? = nil) -> ZoneReading {
         guard width > 0, height > 0, depth.count == width * height else {
             return ZoneReading(danger: [0, 0, 0])
         }
+        if let t = time {
+            if let last = lastTime, t - last > 1.0 { floorRef = nil; atFeetFrames = 0 }
+            lastTime = t
+        }
         let floorNow = max(median(region(depth, width, height, floorRows, floorCols)), 1e-6)
         if let ref = floorRef {
-            if floorNow < 1.5 * ref { floorRef = 0.9 * ref + 0.1 * floorNow }
+            if floorNow < 1.5 * ref {
+                floorRef = 0.9 * ref + 0.1 * floorNow
+                atFeetFrames = 0
+            } else {
+                atFeetFrames += 1
+                if atFeetFrames > maxAtFeetFrames {   // stuck: trust the current floor instead
+                    floorRef = floorNow
+                    atFeetFrames = 0
+                }
+            }
         } else {
             floorRef = floorNow
         }

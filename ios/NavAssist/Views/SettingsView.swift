@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var places: [PlaceFile] = []
     @State private var confirmDelete: PlaceFile?
+    @State private var cannotDeleteActive = false
     @State private var tripCount = 0
     @State private var exportURL: URL?
     @State private var confirmDeleteTrips = false
@@ -82,7 +83,10 @@ struct SettingsView: View {
                     }
                     .accessibilityElement(children: .combine)
                 }
-                .onDelete { idx in confirmDelete = idx.first.map { places[$0] } }
+                .onDelete { idx in
+                    guard let p = idx.first.map({ places[$0] }) else { return }
+                    if p.name == app.activePlaceName { cannotDeleteActive = true } else { confirmDelete = p }
+                }
             } header: {
                 Text("Saved maps")
             } footer: {
@@ -107,6 +111,11 @@ struct SettingsView: View {
                 if let p = confirmDelete { try? app.store.delete(p) }
                 places = app.store.list()
             }
+        }
+        .alert("This map is in use", isPresented: $cannotDeleteActive) {
+            Button("OK") {}
+        } message: {
+            Text("NavAssist is using this map right now. Open the app somewhere else, or start a new map, before deleting it.")
         }
         .confirmationDialog("Delete all \(tripCount) trip logs? Export them first if you need them.",
                             isPresented: $confirmDeleteTrips, titleVisibility: .visible) {

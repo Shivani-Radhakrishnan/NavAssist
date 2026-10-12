@@ -69,20 +69,32 @@ data class MetricZoneAnalyzer(
  * Relative depth only (bigger = closer, no units): the floor just in front of the user is
  * the ruler, and a zone that looks much closer than that floor is blocked.
  */
-class RelativeDepthZoneAnalyzer(var warnRatio: Double = 1.5) {
+class RelativeDepthZoneAnalyzer(var warnRatio: Double = 1.5, var maxAtFeetFrames: Int = 10) {
     private val floorRows = 0.85 to 1.00
     private val floorCols = 0.30 to 0.70
     private val zoneRows = 0.15 to 0.75
     private var floorRef: Double? = null
+    private var lastTime: Double? = null
+    private var atFeetFrames = 0
 
-    /** [depth] is row-major, width x height, upright, bigger = closer. */
-    fun analyze(depth: FloatArray, width: Int, height: Int): ZoneReading {
+    /**
+     * [depth] is row-major, width x height, upright, bigger = closer. Pass [time] (seconds) when
+     * frames can be far apart: a ruler older than 1 s is dropped. "At your feet" persisting for
+     * more than [maxAtFeetFrames] frames re-seeds the ruler instead of saying stop forever.
+     */
+    fun analyze(depth: FloatArray, width: Int, height: Int, time: Double? = null): ZoneReading {
         if (width <= 0 || height <= 0 || depth.size != width * height) return ZoneReading(listOf(0.0, 0.0, 0.0))
+        if (time != null) {
+            val last = lastTime
+            if (last != null && time - last > 1.0) { floorRef = null; atFeetFrames = 0 }
+            lastTime = time
+        }
         val floorNow = max(median(region(depth, width, height, floorRows, floorCols)), 1e-6)
         val previous = floorRef
         floorRef = when {
             previous == null -> floorNow
-            floorNow < 1.5 * previous -> 0.9 * previous + 0.1 * floorNow
+            floorNow < 1.5 * previous -> { atFeetFrames = 0; 0.9 * previous + 0.1 * floorNow }
+            ++atFeetFrames > maxAtFeetFrames -> { atFeetFrames = 0; floorNow }
             else -> previous
         }
         val ref = floorRef!!
