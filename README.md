@@ -2,7 +2,7 @@
 
 **Voice-first indoor navigation for blind and low-vision people, on an iPhone.**
 
-[![Tests](https://github.com/Shivani-Radhakrishnan/NavAssist/actions/workflows/tests.yml/badge.svg)](https://github.com/Shivani-Radhakrishnan/NavAssist/actions/workflows/tests.yml)
+[![Tests](https://github.com/Shivani-Radhakrishnan/NavAssist/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Shivani-Radhakrishnan/NavAssist/actions/workflows/tests.yml)
 
 NavAssist maps a building as you walk through it. Say *"save this place as kitchen"* to
 remember a spot, then later say *"take me to kitchen"* to get turn-by-turn spoken and vibration
