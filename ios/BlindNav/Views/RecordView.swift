@@ -19,9 +19,12 @@ struct RecordView: View {
         VStack(spacing: 12) {
             if let s = session {
                 status(s)
+                CameraPreview(session: app.ar.session)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(maxHeight: .infinity)
                 RouteMapView(graph: s.graph, you: app.ar.position, heading: app.ar.heading)
                     .id(s.revision)
-                    .frame(maxHeight: .infinity)
+                    .frame(height: 150)
                 HStack(spacing: 12) {
                     BigButton(title: "Add landmark", systemImage: "mappin.and.ellipse") {
                         landmarkName = ""
