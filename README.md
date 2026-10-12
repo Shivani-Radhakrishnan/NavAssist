@@ -38,8 +38,22 @@ With VoiceOver on, double-tap the screen or use the two-finger double-tap (magic
   right in front."
   - **iPhone Pro (LiDAR):** measured 3-D distances, with the floor and ceiling filtered out,
     so head-height obstacles are caught.
-  - **Other iPhones:** a Depth Anything V2 network estimates depth from the camera. It needs
-    the model file; see [Adding the depth model](#adding-the-depth-model).
+  - **Other iPhones:** a Depth Anything V2 network estimates *relative* depth from the camera,
+    and ARKit's tracked feature points (which have real 3-D positions) convert it to meters
+    every frame. On 12 frames of the TUM RGB-D `freiburg1_room` sequence, using 200 sparse
+    points with true depth as stand-ins for ARKit's points, the converted depth had a median
+    error of **5 cm** (4 cm for objects under 2 m) and 96% of pixels within 20% of the true
+    depth (`analysis/metric_depth_check.swift`). Real ARKit points are noisier, so expect worse
+    on the phone. It needs the model file; see [Adding the depth model](#adding-the-depth-model).
+  - Only things in the 60 cm walking corridor count as "ahead". Objects beside the path
+    are mentioned only when you're about to brush past them (under 70 cm).
+- **Doors**: ARKit classifies flat surfaces as doors (iPhone XS and later), and Apple's image
+  classifier double-checks. A blocked path at a door becomes "Door ahead, 1.5 meters. Reach
+  forward for the handle." (It can't tell whether a door is locked.)
+- **Unknown stairs and drop-offs**: the walking surface in the corridor is checked in 25 cm
+  slices; a drop of 15 cm or more, or rises of step height, triggers "Careful. Stairs or a drop
+  going down, 2 meters ahead. Stop and find the handrail." Apple's image classifier adds
+  "Stairs may be ahead" when it sees stairs without measurable geometry.
 
 Settings (the gear) holds distance units, voice speed, vibrations, and the list of saved maps.
 
@@ -114,7 +128,7 @@ prototype/                The original Python step-by-step prototype (TUM RGB-D 
 cd ios/BlindNavCore && swift test
 ```
 
-There are 49 tests (69 checks including each voice phrasing). They cover routing between separately recorded walks, simplifying ARKit
+There are 59 tests (79 checks including each voice phrasing). They cover routing between separately recorded walks, simplifying ARKit
 wobble into clean legs, simulated walks around corners, off-route detection, rate-limited
 corrections, hesitation and early-turn detection and prediction (with simulated walkers), obstacle zones (floor removal, head-height obstacles, the "stop" distance),
 and making sure warnings don't flicker.
@@ -162,7 +176,7 @@ This is only needed for iPhones **without** LiDAR (non-Pro models).
 - Routes exist only where someone has walked with the app open.
 - Finding the user's location needs the room to look roughly as it did when it was recorded.
   Big lighting or furniture changes can stop the place from being recognized.
-- Stairs are only known on paths walked before; new stairs or drop-offs ahead are not detected.
+- Detecting unknown stairs and drop-offs from the camera is best effort, especially without LiDAR. Always use a cane.
 - No moving-obstacle prediction. People walking past are treated like any other obstacle.
 - The camera must point forward. Guidance pauses (and says so) if tracking is lost,
   for example when the phone goes into a pocket.

@@ -53,7 +53,7 @@ final class ARController: NSObject, ARSessionDelegate {
 
     func start(worldMap: ARWorldMap? = nil) {
         let config = ARWorldTrackingConfiguration()
-        config.planeDetection = [.horizontal]
+        config.planeDetection = [.horizontal, .vertical]   // vertical: walls and doors
         config.worldAlignment = .gravity
         if Self.hasLiDAR { config.frameSemantics.insert(.sceneDepth) }
         config.initialWorldMap = worldMap

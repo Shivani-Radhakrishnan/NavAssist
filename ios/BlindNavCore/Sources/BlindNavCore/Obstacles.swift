@@ -29,11 +29,15 @@ public struct ZoneReading: Sendable {
     public var meters: [Double?]
     /// Something is so close in front that the user should stop right away.
     public var immediateStop: Bool
+    /// Doors and stairs recognised in the same frame.
+    public var hints: SceneHints
 
-    public init(danger: [Double], meters: [Double?] = [nil, nil, nil], immediateStop: Bool = false) {
+    public init(danger: [Double], meters: [Double?] = [nil, nil, nil], immediateStop: Bool = false,
+                hints: SceneHints = SceneHints()) {
         self.danger = danger
         self.meters = meters
         self.immediateStop = immediateStop
+        self.hints = hints
     }
 }
 
@@ -42,9 +46,12 @@ public struct ZoneReading: Sendable {
 /// For iPhones with LiDAR: real 3-D points, so obstacles get real distances, and the
 /// floor and ceiling can be removed by height instead of guessing from the picture.
 public struct MetricZoneAnalyzer: Sendable {
-    public var bodyHalfWidth = 0.35     // the "center" corridor is 70 cm wide
-    public var sideReach = 1.2          // side zones reach this far left/right
-    public var warnDistance = 1.5       // obstacles closer than this are reported
+    public var bodyHalfWidth = 0.3      // the walking corridor ("ahead") is 60 cm wide
+    public var sideReach = 1.0          // side zones reach this far left/right
+    public var warnDistance = 1.5       // obstacles ahead closer than this are reported
+    /// Things beside the path (a basket, a chair against the wall) only matter when you're
+    /// about to brush past them.
+    public var sideWarnDistance = 0.7
     public var stopDistance = 0.6       // ...and closer than this in the center: "Stop"
     public var maxRange = 4.0
     public var minHeight = 0.12         // ignore the floor (and tiny bumps under 12 cm)
@@ -74,7 +81,8 @@ public struct MetricZoneAnalyzer: Sendable {
         for z in 0..<3 where buckets[z].count >= minPoints {
             let near = percentile(buckets[z], 0.05)      // nearest 5%, ignoring stray points
             meters[z] = near
-            danger[z] = warnDistance / max(near, 0.05)
+            let limit = z == Zone.center.rawValue ? warnDistance : sideWarnDistance
+            danger[z] = limit / max(near, 0.05)
         }
         let stop = (meters[Zone.center.rawValue] ?? .infinity) < stopDistance
         return ZoneReading(danger: danger, meters: meters, immediateStop: stop)
@@ -172,6 +180,10 @@ public struct ObstacleAnnouncer: Sendable {
     private var pendingSince = 0.0
     private var clearSince: Double?
     private var stopSaidAt = -Double.infinity
+    private var stairsSaidAt = -Double.infinity
+    private var stairsSeenSince: Double?
+    private var stairsInViewSaidAt = -Double.infinity
+    private var lastHints = SceneHints()
 
     public init() {}
 
@@ -182,6 +194,22 @@ public struct ObstacleAnnouncer: Sendable {
     }
 
     public mutating func update(_ r: ZoneReading, time t: Double) -> [GuidanceEvent] {
+        lastHints = r.hints
+        // Stairs and drop-offs come first: seen in two readings in a row, then said at once.
+        if let s = r.hints.stairs {
+            if stairsSeenSince == nil { stairsSeenSince = t }
+            if let since = stairsSeenSince, t - since >= 0.15, t - stairsSaidAt >= 6 {
+                stairsSaidAt = t
+                let what = s.direction == .down ? "Stairs or a drop going down" : "Steps going up"
+                return [.haptic(.stop), .speak("Careful. \(what), \(phrasing.distance(s.distance)) ahead. Stop and find the handrail.", urgent: true)]
+            }
+        } else {
+            stairsSeenSince = nil
+        }
+        if r.hints.stairsInView, t - stairsInViewSaidAt >= 15, t - stairsSaidAt >= 6 {
+            stairsInViewSaidAt = t
+            return [.haptic(.obstacle), .speak("Stairs may be ahead. Slow down.", urgent: false)]
+        }
         if r.immediateStop {
             // Never delay this one; repeat every 2 s while it lasts.
             if t - stopSaidAt >= 2 {
@@ -249,6 +277,9 @@ public struct ObstacleAnnouncer: Sendable {
         let (l, c, r) = (blocked[0], blocked[1], blocked[2])
         if c {
             var ahead = "Obstacle ahead"
+            if let door = lastHints.doorAhead, abs(door - (meters[1] ?? door)) < 0.8 {
+                return "Door ahead, \(phrasing.distance(door)). Reach forward for the handle."
+            }
             if let m = meters[1] { ahead += ", \(phrasing.distance(m))" }
             if l && r { return ahead + ". Stop." }
             return ahead + ", clearer on the \(side ?? "left")"
