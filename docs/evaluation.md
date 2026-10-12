@@ -26,38 +26,22 @@ every push via GitHub Actions.
 The simulated walkers check that each piece works end to end. They are not evidence about
 how real people walk.
 
-## Depth accuracy without LiDAR
+## Offline benchmarks
 
-`analysis/metric_depth_check.swift` measures how well the camera-only pipeline recovers real
-distances, using the TUM RGB-D `freiburg1_room` sequence, which has true depth for each frame:
+`navassist-eval` (in `ios/NavAssistCore/Sources/NavAssistEval`) runs the app's own code on the
+TUM RGB-D dataset and on simulated walkers. Results, methods and caveats are in the
+[technical report](technical-report.md). In summary:
 
-1. Run Depth Anything V2 (the same Core ML model the app uses) on an RGB frame.
-2. Take 200 random pixels with known depth (with ±3% noise) as stand-ins for ARKit feature points.
-3. Fit `network value = a / meters + b` with the same robust fit the app uses (`InverseDepthFit`).
-4. Convert every other pixel to meters and compare with the true depth.
-
-Result over 12 frames spread across the sequence:
-
-| Metric | Value |
+| Experiment | Result |
 |---|---|
-| Median absolute error, all pixels | **0.05 m** |
-| Median absolute error, objects closer than 2 m | **0.04 m** |
-| Pixels within 20% of true depth | **96%** |
-| Per-frame median error | 0.02 – 0.13 m |
+| Camera-only depth vs true depth (137 frames) | AbsRel 0.070, δ<1.25 95.3%, median error 6 cm (2–4 cm within 1.5 m) |
+| Baseline: one depth conversion for the whole sequence | AbsRel 0.172, δ<1.25 70.0% |
+| Points needed for the fit | Nearly flat from 25 points; 10% point noise costs about 0.01 AbsRel |
+| Obstacle zones vs true-depth decisions (F1, left / ahead / right) | 0.89 / 0.99 / 0.96, vs 0.53 / 0.57 / 0.61 for the original relative method |
+| Distance to the obstacle ahead | Median error 1.5 cm, 90th percentile 17 cm |
+| Early-turn predictor, simulated | AUC 0.83; 88% caught about 2 s early at 5.8 false alarms/min, or 13% at ≤ 1/min |
 
-**Caveats:** real ARKit feature points are noisier than the stand-ins and cluster on textured
-surfaces. Dark rooms and blank walls give few points, and then the app falls back to a
-stricter relative-depth mode. Accuracy on the phone will be lower than this.
-
-To reproduce:
-
-```bash
-xcrun swiftc -O analysis/metric_depth_check.swift -o /tmp/metric_depth_check
-/tmp/metric_depth_check path/to/DepthAnythingV2SmallF16.mlmodelc prototype/rgbd_dataset_freiburg1_room
-```
-
-The compiled `.mlmodelc` is inside the built app (Xcode's build products), or compile the
-package yourself with `xcrun coremlcompiler compile DepthAnythingV2SmallF16.mlpackage .`
+Reproduce with the commands under *Reproducing the results* in the report.
 
 ## Not yet measured
 

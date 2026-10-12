@@ -27,15 +27,7 @@ tap anywhere and speak.
 
 ## How it works
 
-```
- Camera + motion ─▶ ARKit tracking ─▶ position, heading, height ─┬─▶ trail recorder ─▶ route graph (saved)
-        │                                                        ├─▶ guidance ─▶ speech + haptics
-        │                                                        └─▶ behaviour predictor ─▶ adaptive cues
-        ├─▶ depth (LiDAR, or Depth Anything + ARKit points) ─▶ 3-D points ─▶ obstacles, stairs
-        ├─▶ ARKit planes + Vision classifier ─▶ doors, stairs
-        └─▶ Vision text recognition ─▶ signs ─▶ named destinations
- Tap ─▶ on-device speech recognition ─▶ command parser ─▶ save / navigate / where am I / …
-```
+![Architecture](docs/images/architecture.svg)
 
 The navigation logic (route graph, routing, guidance, stairs, voice command parsing, place
 matching, obstacle zones, behaviour prediction, trip logs) is a platform-independent Swift
@@ -51,9 +43,11 @@ ios/
     Services/               speech, voice commands, haptics, storage, settings
     Views/                  main screen, settings, camera preview
   NavAssistCore/            Swift package: navigation logic and its tests
-analysis/                   Python scripts for the user study, plus the depth accuracy check
-prototype/                  The original Python prototype on the TUM RGB-D dataset
-docs/                       Setup, evaluation and research-study guides
+    Sources/NavAssistEval/  offline benchmark (TUM RGB-D + simulated walkers)
+analysis/                   user-study analysis, predictor training, figure generation (Python)
+results/                    raw benchmark outputs behind every number in the report
+docs/                       technical report, setup, evaluation and research-study guides
+prototype/                  the original Python prototype on the TUM RGB-D dataset
 ```
 
 ## Getting started
@@ -68,15 +62,37 @@ To run the app on an iPhone, see **[docs/setup.md](docs/setup.md)**. You need Xc
 later, a free Apple ID, and, for obstacle warnings on non-Pro iPhones, Apple's Depth Anything
 V2 model.
 
-## Evaluation
+## Results
 
-- **Automated tests:** 59 tests (79 checks). They cover routing, guidance with simulated walkers,
-  stairs, voice parsing, sign matching, obstacle zones, and behaviour prediction.
-- **Depth accuracy without LiDAR:** on the TUM RGB-D `freiburg1_room` sequence, converting
-  Depth Anything's relative depth to meters with 200 sparse points gave a **5 cm median error**
-  and 96% of pixels within 20% of the true depth.
+Measured offline with the app's own code. Full method, tables and caveats are in the
+**[technical report](docs/technical-report.md)**. Raw numbers are in [`results/`](results/).
 
-Details and caveats are in **[docs/evaluation.md](docs/evaluation.md)**.
+**Metric depth on a phone without LiDAR.** Depth Anything V2's relative depth, converted to
+meters every frame using ARKit's sparse tracked points (TUM RGB-D `freiburg1_room`, 137 frames):
+
+| Method | AbsRel ↓ | δ<1.25 ↑ | Median error |
+|---|---|---|---|
+| One conversion for the whole sequence | 0.172 | 70.0% | 26 cm |
+| **Per-frame fit (NavAssist)** | **0.070** | **95.3%** | **6 cm** |
+
+![Depth examples](docs/images/depth_qualitative.png)
+
+**Obstacle warnings** agree with decisions made on true depth far better than the original
+relative-depth method. That method was what flagged a basket beside the path as "ahead".
+
+| Zone | NavAssist F1 | Original method F1 |
+|---|---|---|
+| Left | 0.89 | 0.53 |
+| Ahead | **0.99** | 0.57 |
+| Right | 0.96 | 0.61 |
+
+<p align="center"><img src="docs/images/obstacle_zones.png" width="85%" alt="Obstacle zone precision, recall and F1"></p>
+
+**Behaviour prediction (simulated walkers).** A trained model ranks upcoming early turns well
+(AUC 0.83, about 2 s lead), but at ≤ 1 false alarm per minute it catches only 13% of them.
+That is why the next step is training on real trip logs.
+
+**Tests.** 59 automated tests (79 checks) run on every push. See [docs/evaluation.md](docs/evaluation.md).
 
 ## Research study tools
 

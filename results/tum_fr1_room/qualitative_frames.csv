@@ -1,0 +1,5 @@
+frame,rgb,true_depth,estimated_depth_png
+170,rgb/1305031916.433168.png,depth/1305031916.445160.png,estimated_depth_0170.png
+510,rgb/1305031927.769158.png,depth/1305031927.755615.png,estimated_depth_0510.png
+850,rgb/1305031939.101368.png,depth/1305031939.099862.png,estimated_depth_0850.png
+1190,rgb/1305031950.436983.png,depth/1305031950.447451.png,estimated_depth_1190.png

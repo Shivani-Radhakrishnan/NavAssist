@@ -60,6 +60,10 @@ public struct BehaviorFeatures: Equatable, Sendable {
     public static let names = ["speed", "speedDrop", "headingRate", "oscillation",
                                "nearCorner", "turningTowardNextLeg", "lateralTowardTurn"]
     public var values: [Double]
+
+    public init(values: [Double]) {
+        self.values = values
+    }
 }
 
 public struct FeatureExtractor: Sendable {
@@ -89,13 +93,12 @@ public struct FeatureExtractor: Sendable {
         return history.filter { last.t - $0.t <= seconds }
     }
 
-    /// Average speed in m/s over the last `seconds`.
+    /// Speed in m/s over the last `seconds`, from the net distance moved. (Summing the step
+    /// lengths instead would turn tracking jitter into fake speed while standing still.)
     func speed(over seconds: Double) -> Double {
         let w = window(seconds)
         guard let a = w.first, let b = w.last, b.t > a.t else { return 0 }
-        var d = 0.0
-        for (p, q) in zip(w, w.dropFirst()) { d += Vec2(p.x, p.y).distance(to: Vec2(q.x, q.y)) }
-        return d / (b.t - a.t)
+        return Vec2(a.x, a.y).distance(to: Vec2(b.x, b.y)) / (b.t - a.t)
     }
 
     /// 0 = walking as fast as in the last 5 s; 1 = stopped.
@@ -275,9 +278,9 @@ public struct BehaviorDetector: Sendable {
         recent.removeAll { s.t - $0.t > 1.0 }
         var out: [TripEvent] = []
 
-        var moved = 0.0
-        for (p, q) in zip(recent, recent.dropFirst()) { moved += Vec2(p.x, p.y).distance(to: Vec2(q.x, q.y)) }
+        // Net distance over the last second, so tracking jitter doesn't look like walking.
         let span = (recent.last?.t ?? 0) - (recent.first?.t ?? 0)
+        let moved = recent.first.map { a in Vec2(a.x, a.y).distance(to: Vec2(s.x, s.y)) } ?? 0
         let speed = span > 0.5 ? moved / span : 1
         if speed < stopSpeed, s.distToDestination > 1.5 {
             if slowSince == nil { slowSince = s.t }

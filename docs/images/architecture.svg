@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 400" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="13">
+  <title>NavAssist architecture: sensors, perception, NavAssistCore, outputs</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <style>
+      .panel { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1; }
+      .box { fill: #ffffff; stroke-width: 1.3; }
+      .in { stroke: #93c5fd; } .pe { stroke: #cbd5e1; } .co { stroke: #86efac; } .ou { stroke: #fdba74; }
+      .t { fill: #0f172a; font-weight: 600; }
+      .s { fill: #475569; font-size: 11.5px; }
+      .h { fill: #334155; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; }
+      .l { stroke: #64748b; stroke-width: 2.2; fill: none; marker-end: url(#a); }
+    </style>
+  </defs>
+  <rect width="1100" height="400" fill="#ffffff"/>
+
+  <!-- 1. sensors -->
+  <rect x="10" y="10" width="245" height="380" rx="12" class="panel"/>
+  <text x="26" y="38" class="h">SENSORS (iPhone)</text>
+  <rect x="24" y="55" width="217" height="58" rx="8" class="box in"/>
+  <text x="38" y="79" class="t">Camera + IMU</text><text x="38" y="98" class="s">ARKit visual-inertial tracking</text>
+  <rect x="24" y="125" width="217" height="58" rx="8" class="box in"/>
+  <text x="38" y="149" class="t">LiDAR (Pro iPhones)</text><text x="38" y="168" class="s">real depth map</text>
+  <rect x="24" y="195" width="217" height="58" rx="8" class="box in"/>
+  <text x="38" y="219" class="t">Depth Anything V2</text><text x="38" y="238" class="s">Core ML, relative depth</text>
+  <rect x="24" y="265" width="217" height="58" rx="8" class="box in"/>
+  <text x="38" y="289" class="t">Microphone</text><text x="38" y="308" class="s">tap anywhere, on-device ASR</text>
+
+  <path class="l" d="M260,200 H286"/>
+
+  <!-- 2. perception -->
+  <rect x="290" y="10" width="265" height="380" rx="12" class="panel"/>
+  <text x="306" y="38" class="h">PERCEPTION (app)</text>
+  <rect x="304" y="55" width="237" height="58" rx="8" class="box pe"/>
+  <text x="318" y="79" class="t">Pose, heading, height</text><text x="318" y="98" class="s">relocalises on saved world maps</text>
+  <rect x="304" y="125" width="237" height="58" rx="8" class="box pe"/>
+  <text x="318" y="149" class="t">Metric 3-D points</text><text x="318" y="168" class="s">depth → meters via ARKit points</text>
+  <rect x="304" y="195" width="237" height="58" rx="8" class="box pe"/>
+  <text x="318" y="219" class="t">Signs, doors, stairs in view</text><text x="318" y="238" class="s">Vision OCR + classifier, planes</text>
+  <rect x="304" y="265" width="237" height="58" rx="8" class="box pe"/>
+  <text x="318" y="289" class="t">Voice command parser</text><text x="318" y="308" class="s">save, navigate, where is, …</text>
+
+  <path class="l" d="M560,200 H586"/>
+
+  <!-- 3. core -->
+  <rect x="590" y="10" width="265" height="380" rx="12" class="panel"/>
+  <text x="606" y="38" class="h">NAVASSISTCORE (59 tests)</text>
+  <rect x="604" y="55" width="237" height="52" rx="8" class="box co"/>
+  <text x="618" y="77" class="t">Route graph + A*</text><text x="618" y="95" class="s">walked trails, floors, places</text>
+  <rect x="604" y="115" width="237" height="52" rx="8" class="box co"/>
+  <text x="618" y="137" class="t">Turn-by-turn guide</text><text x="618" y="155" class="s">clock cues, re-plan, stairs</text>
+  <rect x="604" y="175" width="237" height="52" rx="8" class="box co"/>
+  <text x="618" y="197" class="t">Obstacle zones, drops, steps</text><text x="618" y="215" class="s">60 cm corridor, hysteresis</text>
+  <rect x="604" y="235" width="237" height="52" rx="8" class="box co"/>
+  <text x="618" y="257" class="t">Behaviour predictor</text><text x="618" y="275" class="s">hesitation, early turn, ~2 s ahead</text>
+  <rect x="604" y="295" width="237" height="52" rx="8" class="box co"/>
+  <text x="618" y="317" class="t">Place matcher</text><text x="618" y="335" class="s">fuzzy names, spoken numbers</text>
+
+  <path class="l" d="M860,200 H886"/>
+
+  <!-- 4. outputs -->
+  <rect x="890" y="10" width="200" height="380" rx="12" class="panel"/>
+  <text x="906" y="38" class="h">OUTPUT</text>
+  <rect x="904" y="55" width="172" height="58" rx="8" class="box ou"/>
+  <text x="918" y="79" class="t">Speech</text><text x="918" y="98" class="s">urgent cues interrupt</text>
+  <rect x="904" y="125" width="172" height="58" rx="8" class="box ou"/>
+  <text x="918" y="149" class="t">Haptics</text><text x="918" y="168" class="s">left, right, stop</text>
+  <rect x="904" y="195" width="172" height="58" rx="8" class="box ou"/>
+  <text x="918" y="219" class="t">Saved maps</text><text x="918" y="238" class="s">graph + ARKit world map</text>
+  <rect x="904" y="265" width="172" height="58" rx="8" class="box ou"/>
+  <text x="918" y="289" class="t">Trip logs</text><text x="918" y="308" class="s">10 Hz CSV for studies</text>
+</svg>
