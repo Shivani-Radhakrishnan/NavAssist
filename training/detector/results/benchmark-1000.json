@@ -1,0 +1,34 @@
+{
+  "all" : {
+    "images" : 712,
+    "median_ms" : 8.9050531387329102,
+    "p90_ms" : 11.44099235534668
+  },
+  "at_app_thresholds_door" : {
+    "false_pos" : 269,
+    "missed" : 538,
+    "precision" : 0.47563352826510719,
+    "recall" : 0.31202046035805625,
+    "true_pos" : 244
+  },
+  "at_app_thresholds_door handle" : {
+    "false_pos" : 50,
+    "missed" : 82,
+    "precision" : 0.4845360824742268,
+    "recall" : 0.36434108527131781,
+    "true_pos" : 47
+  },
+  "at_app_thresholds_stairs" : {
+    "false_pos" : 51,
+    "missed" : 71,
+    "precision" : 0.61654135338345861,
+    "recall" : 0.53594771241830064,
+    "true_pos" : 82
+  },
+  "cpu" : {
+    "images" : 712,
+    "median_ms" : 24.743080139160156,
+    "p90_ms" : 29.983997344970703
+  },
+  "model_megabytes" : 6.9350459999999998
+}

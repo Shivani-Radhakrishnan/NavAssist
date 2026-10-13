@@ -100,8 +100,10 @@ ARKit typically tracks well over 25 points in a textured room.*
 Obstacles are reported only inside a 60 cm walking corridor ("ahead", within 1.5 m), or
 beside it when within 0.7 m ("left" / "right"). Points 12 cm to 2 m above the floor count, so
 the floor is ignored and head-height obstacles are kept. Smoothing and hysteresis keep
-warnings from flickering. Doors are recognised with ARKit's plane classification plus Apple's
-image classifier. Drops and steps are detected from the walking-surface height in 25 cm slices.
+warnings from flickering. Doors are recognised with ARKit's plane classification plus a door / door-handle / stairs
+detector trained on Open Images (see `training/detector`; it replaced Apple's image classifier,
+finding stairs in 79% of test pictures against 47%). Drops and steps are detected from the
+walking-surface height in 25 cm slices.
 
 ### Experiment
 

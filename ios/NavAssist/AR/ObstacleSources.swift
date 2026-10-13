@@ -81,24 +81,67 @@ struct FrameContext {
     }
 }
 
-/// Apple's built-in image classifier, about once a second: is there a door or stairs in view?
+/// About once a second: where are doors, door handles and stairs in view?
+///
+/// With the bundled detector (DoorStairsDetector, trained on Open Images; see training/detector)
+/// it finds boxes, which together with depth give "door 2 meters ahead, handle on the right" and
+/// "stairs ahead, 3 meters". Without the model it falls back to Apple's image classifier, which
+/// only says whether a door or stairs are probably in the picture.
 /// Only used from the obstacle source's background queue.
 final class SceneClassifier {
     private var last: TimeInterval = 0
     private(set) var door: Float = 0
     private(set) var stairs: Float = 0
+    private(set) var detections: [Detection] = []
+    private let interpreter = DetectionInterpreter()
+
+    static let detector: VNCoreMLModel? = {
+        guard let url = Bundle.main.url(forResource: "DoorStairsDetector", withExtension: "mlmodelc"),
+              let ml = try? MLModel(contentsOf: url, configuration: MLModelConfiguration()) else { return nil }
+        return try? VNCoreMLModel(for: ml)
+    }()
 
     func update(_ image: CVPixelBuffer, at t: TimeInterval) {
         guard t - last >= 1.0 else { return }
         last = t
-        let request = VNClassifyImageRequest()
         let handler = VNImageRequestHandler(cvPixelBuffer: image, orientation: .right)
+        if let model = Self.detector {
+            let request = VNCoreMLRequest(model: model)
+            request.imageCropAndScaleOption = .scaleFill
+            guard (try? handler.perform([request])) != nil,
+                  let results = request.results as? [VNRecognizedObjectObservation] else { return }
+            detections = results.compactMap { obs in
+                guard let top = obs.labels.first, let kind = Detection.Kind(rawValue: top.identifier) else { return nil }
+                let b = obs.boundingBox   // upright image, bottom-left origin
+                return Detection(kind: kind, confidence: Double(top.confidence), x: Double(b.minX),
+                                 y: Double(1 - b.maxY), width: Double(b.width), height: Double(b.height))
+            }
+            return
+        }
+        let request = VNClassifyImageRequest()
         guard (try? handler.perform([request])) != nil, let results = request.results else { return }
         door = results.first { $0.identifier == "door" }?.confidence ?? 0
         stairs = results.first { $0.identifier == "stairs" || $0.identifier == "escalator" }?.confidence ?? 0
     }
 
-    func hints(for reading: ZoneReading, doorFromPlanes: Double?, stairs cue: StairCue?) -> SceneHints {
+    /// `depth(x, y)`: meters at a point of the upright image (normalised, top-left origin).
+    func hints(for reading: ZoneReading, doorFromPlanes: Double?, stairs cue: StairCue?,
+               depth: ((Double, Double) -> Double?)? = nil) -> SceneHints {
+        if Self.detector != nil {
+            var hints = interpreter.hints(from: detections, depth: depth ?? { _, _ in nil })
+            if hints.doorAhead == nil { hints.doorAhead = doorFromPlanes }
+            // A door is seen ahead but its distance is unknown, and something blocks the path: that's the door.
+            if hints.doorAhead == nil, reading.danger[Zone.center.rawValue] >= 1,
+               detections.contains(where: { $0.kind == .door && $0.confidence >= 0.5 && $0.x < 0.7 && $0.maxX > 0.3 }) {
+                hints.doorAhead = reading.meters[Zone.center.rawValue]
+            }
+            if let cue {   // the floor-profile stair detector measured them: that wins
+                hints.stairs = cue
+                hints.stairsInView = false
+                hints.stairsAhead = nil
+            }
+            return hints
+        }
         var door = doorFromPlanes
         // The classifier sees a door and something is blocking the path: that something is the door.
         if door == nil, self.door > 0.5, reading.danger[Zone.center.rawValue] >= 1 {
@@ -141,7 +184,9 @@ final class LiDARObstacleSource: ObstacleSource {
             }
             self.classifier.update(image, at: ctx.timestamp)
             var reading = analyzer.analyze(points)
-            reading.hints = self.classifier.hints(for: reading, doorFromPlanes: ctx.doorAhead, stairs: self.stairs.detect(points))
+            let lookup = samples.lookup(stride: self.stride)
+            reading.hints = self.classifier.hints(for: reading, doorFromPlanes: ctx.doorAhead,
+                                                  stairs: self.stairs.detect(points), depth: lookup)
             DispatchQueue.main.async {
                 self.busy = false
                 self.onReading?(reading, ctx.timestamp)
@@ -152,6 +197,28 @@ final class LiDARObstacleSource: ObstacleSource {
     private struct Samples {
         var width = 0, height = 0
         var values: [(u: Float, v: Float, d: Float)] = []
+
+        /// Meters at an upright-image point: the closest confident sample in the 3 x 3 cells around it.
+        func lookup(stride: Int) -> (Double, Double) -> Double? {
+            let gw = width / stride + 1, gh = height / stride + 1
+            var grid = [Float](repeating: .nan, count: gw * gh)
+            for s in values { grid[Int(s.v) / stride * gw + Int(s.u) / stride] = s.d }
+            let w = Float(width), h = Float(height)
+            return { x, y in
+                // upright (x, y) -> landscape depth-map pixel (u, v) = (y, 1 - x)
+                let gu = Int(Float(y) * w) / stride, gv = Int(Float(1 - x) * h) / stride
+                var best = Float.infinity
+                for dv in -1...1 {
+                    for du in -1...1 {
+                        let u = gu + du, v = gv + dv
+                        guard u >= 0, u < gw, v >= 0, v < gh else { continue }
+                        let d = grid[v * gw + u]
+                        if d.isFinite { best = min(best, d) }
+                    }
+                }
+                return best.isFinite ? Double(best) : nil
+            }
+        }
     }
 
     private static func copySamples(depth: CVPixelBuffer, confidence: CVPixelBuffer?, stride: Int) -> Samples {
@@ -293,7 +360,12 @@ final class NeuralObstacleSource: ObstacleSource {
                 }
             }
             var reading = analyzer.analyze(points)
-            reading.hints = classifier.hints(for: reading, doorFromPlanes: ctx.doorAhead, stairs: stairs.detect(points))
+            let lookup: (Double, Double) -> Double? = { x, y in
+                // upright (x, y) -> landscape camera pixel (u, v) = (y, 1 - x)
+                value(atImage: Float(y) * imgW, Float(1 - x) * imgH).flatMap { fit.meters($0) }
+            }
+            reading.hints = classifier.hints(for: reading, doorFromPlanes: ctx.doorAhead,
+                                             stairs: stairs.detect(points), depth: lookup)
             return reading
         }
 

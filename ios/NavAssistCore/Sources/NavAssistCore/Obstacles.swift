@@ -228,6 +228,9 @@ public struct ObstacleAnnouncer: Sendable {
         }
         if r.hints.stairsInView, t - stairsInViewSaidAt >= 15, t - stairsSaidAt >= 6 {
             stairsInViewSaidAt = t
+            if let m = r.hints.stairsAhead {
+                return [.haptic(.obstacle), .speak("Stairs ahead, \(phrasing.distance(m)). Slow down.", urgent: false)]
+            }
             return [.haptic(.obstacle), .speak("Stairs may be ahead. Slow down.", urgent: false)]
         }
         if r.immediateStop {
@@ -298,6 +301,9 @@ public struct ObstacleAnnouncer: Sendable {
         if c {
             var ahead = "Obstacle ahead"
             if let door = lastHints.doorAhead, abs(door - (meters[1] ?? door)) < 0.8 {
+                if let side = lastHints.handleSide {
+                    return "Door ahead, \(phrasing.distance(door)). Handle on the \(side.rawValue)."
+                }
                 return "Door ahead, \(phrasing.distance(door)). Reach forward for the handle."
             }
             if let m = meters[1] { ahead += ", \(phrasing.distance(m))" }

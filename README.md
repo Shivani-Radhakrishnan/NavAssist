@@ -22,7 +22,7 @@ tap anywhere and speak.
 | **Turn-by-turn guidance** | A* routing over walked paths only. Warns before turns, gives clock-face corrections ("Turn to 9 o'clock"), and re-plans when you go off route. Vibrations: 2 taps = left, 3 = right. |
 | **Sign reading** | On-device OCR reads signs ("Room 204", "Exit"), speaks them, and remembers where they are, so "take me to room 204" works without anyone saving it. |
 | **Obstacles** | Warns about things in a 60 cm walking corridor, plus anything you're about to brush past. LiDAR on Pro iPhones and iPad Pros; on other iPhones, Depth Anything V2 converted to meters with ARKit feature points. |
-| **Doors and stairs** | Recognizes doors with ARKit plane classification and Apple's image classifier. Detects drops and steps from the walking-surface profile, and warns about stairs on known routes from recorded heights. |
+| **Doors and stairs** | A detector trained on Open Images finds doors, door handles and stairs; with depth it says *"Door ahead, 2 meters. Handle on the right."* ARKit plane classification also finds doors, drops and steps are measured from the walking-surface profile, and stairs on known routes come from recorded heights. |
 | **Predictive cues** | Predicts hesitation and early turns from motion signals about 2 s ahead and steps in ("Not yet, keep straight for 2 meters"). Includes a study mode and scripts to measure the effect. |
 
 ## How it works
@@ -31,7 +31,7 @@ tap anywhere and speak.
 
 The navigation logic (route graph, routing, guidance, stairs, voice command parsing, place
 matching, obstacle zones, behaviour prediction, trip logs) is a platform-independent Swift
-package, `NavAssistCore`, with 77 tests that run on a Mac without an iPhone.
+package, `NavAssistCore`, with 83 tests that run on a Mac without an iPhone.
 
 ## Repository layout
 
@@ -57,8 +57,8 @@ prototype/                  the original Python prototype on the TUM RGB-D datas
 Run the tests (Swift on a Mac; Kotlin on any machine with Java 21):
 
 ```bash
-cd ios/NavAssistCore && swift test      # 77 tests
-cd android && ./gradlew :core:test      # 74 tests, Kotlin port
+cd ios/NavAssistCore && swift test      # 83 tests
+cd android && ./gradlew :core:test      # 79 tests, Kotlin port
 ```
 
 To run the app on an iPhone, see **[docs/setup.md](docs/setup.md)**. You need Xcode 16 or
@@ -95,7 +95,13 @@ relative-depth method. That method was what flagged a basket beside the path as 
 (AUC 0.83, about 2 s lead), but at ≤ 1 false alarm per minute it catches only 13% of them.
 That is why the next step is training on real trip logs.
 
-**Tests.** 77 Swift tests and 74 Kotlin tests run on every push. See [docs/evaluation.md](docs/evaluation.md).
+**Doors and stairs detector.** On 717 held-out Open Images test pictures, the trained detector
+finds stairs in **79%** of the pictures that have them (precision 91%), against 47% (precision
+86%) for Apple's image classifier that NavAssist used before, and doors in 71% against 38%, at
+similar precision. It runs in 8.9 ms per picture on an M1 Mac. Method, box-level scores and
+limitations are in [training/detector](training/detector/README.md).
+
+**Tests.** 83 Swift tests and 79 Kotlin tests run on every push. See [docs/evaluation.md](docs/evaluation.md).
 
 ## Research study tools
 
@@ -106,7 +112,7 @@ the predictor. See **[docs/research-study.md](docs/research-study.md)**.
 ## Status and limitations
 
 NavAssist runs on iPhone and iPad (portrait). For Android, the navigation logic is already
-ported to Kotlin (`android/core`, 74 tests). The ARCore app layer is planned, and
+ported to Kotlin (`android/core`, 79 tests). The ARCore app layer is planned, and
 [docs/android.md](docs/android.md) has the plan and how each feature maps to Android.
 
 - Routes exist only where someone has walked with the app open.

@@ -17,6 +17,9 @@ ios/NavAssist.xcodeproj/project.xcworkspace/
 # Depth model for non-LiDAR iPhones (about 50 MB, downloaded separately)
 *.mlpackage/
 *.mlmodel
+# ...except the small door / stairs detector, which ships with the app
+!ios/NavAssist/Models/DoorStairsDetector.mlmodel
+training/detector/output/
 
 # Editors
 .vscode/

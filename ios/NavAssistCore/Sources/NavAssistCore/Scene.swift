@@ -111,13 +111,20 @@ public struct StairDetector: Sendable {
 public struct SceneHints: Equatable, Sendable {
     /// Meters to a door in the walking direction, if one is seen.
     public var doorAhead: Double?
+    /// Which side of that door its handle is on, when the detector sees it.
+    public var handleSide: Side?
     public var stairs: StairCue?
-    /// Apple's image classifier thinks stairs are in view (no distance or direction).
+    /// Stairs are in view (from the detector, or Apple's image classifier as a fallback).
     public var stairsInView = false
+    /// Meters to where those stairs start, when the detector located them and depth is known.
+    public var stairsAhead: Double?
 
-    public init(doorAhead: Double? = nil, stairs: StairCue? = nil, stairsInView: Bool = false) {
+    public init(doorAhead: Double? = nil, handleSide: Side? = nil, stairs: StairCue? = nil,
+                stairsInView: Bool = false, stairsAhead: Double? = nil) {
         self.doorAhead = doorAhead
+        self.handleSide = handleSide
         self.stairs = stairs
         self.stairsInView = stairsInView
+        self.stairsAhead = stairsAhead
     }
 }

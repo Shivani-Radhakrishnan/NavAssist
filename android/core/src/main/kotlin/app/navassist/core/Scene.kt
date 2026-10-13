@@ -99,7 +99,11 @@ class StairDetector(
 data class SceneHints(
     /** Meters to a door in the walking direction, if one is seen. */
     val doorAhead: Double? = null,
+    /** Which side of that door its handle is on, when the detector sees it. */
+    val handleSide: Side? = null,
     val stairs: StairCue? = null,
-    /** An image classifier thinks stairs are in view (no distance or direction). */
+    /** Stairs are in view (from the detector, or an image classifier as a fallback). */
     val stairsInView: Boolean = false,
+    /** Meters to where those stairs start, when the detector located them and depth is known. */
+    val stairsAhead: Double? = null,
 )

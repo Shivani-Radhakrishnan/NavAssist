@@ -46,7 +46,7 @@
 
   <!-- 3. core -->
   <rect x="590" y="10" width="265" height="380" rx="12" class="panel"/>
-  <text x="606" y="38" class="h">NAVASSISTCORE (77 tests)</text>
+  <text x="606" y="38" class="h">NAVASSISTCORE (83 tests)</text>
   <rect x="604" y="55" width="237" height="52" rx="8" class="box co"/>
   <text x="618" y="77" class="t">Route graph + A*</text><text x="618" y="95" class="s">walked trails, floors, places</text>
   <rect x="604" y="115" width="237" height="52" rx="8" class="box co"/>

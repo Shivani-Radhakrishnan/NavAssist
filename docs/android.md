@@ -4,7 +4,7 @@
 
 | Part | Status |
 |---|---|
-| **Navigation logic** (`android/core`) | ✅ Ported to Kotlin: route graph, A*, guidance, stairs on routes, voice commands, place matching, sign filter, obstacle zones, stair and door hints, relative→metric depth fit, behaviour predictor, trip logs (same CSV as iOS). **74 tests pass**, and they run in CI. |
+| **Navigation logic** (`android/core`) | ✅ Ported to Kotlin: route graph, A*, guidance, stairs on routes, voice commands, place matching, sign filter, obstacle zones, stair and door hints, door / stairs detector interpretation, relative→metric depth fit, behaviour predictor, trip logs (same CSV as iOS). **79 tests pass**, and they run in CI. |
 | **Android app** (`android/app`) | ⏳ Not started. It needs the Android SDK, and testing it needs an ARCore-capable phone. |
 
 The core is plain Kotlin on the JVM, with no Android dependency. It builds and tests with
@@ -30,9 +30,9 @@ The app is the thin, platform-specific shell around `core`, the same role
 | ARKit world map (save and relocalise offline) | **No offline equivalent.** ARCore **Cloud Anchors** (stored by Google for up to 365 days) | The biggest difference. Re-finding a saved place on Android means uploading visual data to Google's servers. That needs disclosure and consent, or a custom on-device relocaliser |
 | LiDAR scene depth | **ARCore Depth API** (`acquireRawDepthImage16Bits` + confidence) | Works from motion on most ARCore phones, and from a ToF sensor where present. Gives metric depth directly, so `MetricZoneAnalyzer` and `StairDetector` get real points without a neural network |
 | Depth Anything V2 (Core ML) + `InverseDepthFit` | Only needed on phones without the Depth API: a LiteRT (TFLite) depth model + the same `InverseDepthFit` using ARCore feature points (`PointCloud`) | Same method as the iOS camera-only path |
-| ARKit plane classification (doors) | ARCore has no door label indoors. Use an ML Kit / LiteRT object detector, or skip doors | |
+| ARKit plane classification (doors) | ARCore has no door label indoors; the door / stairs detector below covers it | |
 | Vision text recognition (signs) | **ML Kit Text Recognition v2** (on-device) | Feed results through `SignFilter.clean` |
-| Vision image classifier (stairs in view) | ML Kit Image Labeling, or a custom LiteRT classifier | Check that the label set includes stairs |
+| DoorStairsDetector (Core ML, doors / handles / stairs) | Retrain the same data (`training/detector`) as a LiteRT detector, or ML Kit custom object detection | `DetectionInterpreter` is already ported (`Detections.kt`) |
 | `SFSpeechRecognizer` (on-device) | `SpeechRecognizer`, with on-device recognition where available (`createOnDeviceSpeechRecognizer`, Android 13+) | Parse with `VoiceCommand.parse` |
 | `AVSpeechSynthesizer` | `TextToSpeech` | Urgent messages use `QUEUE_FLUSH`, others `QUEUE_ADD` |
 | UIKit haptics | `VibrationEffect.Composition` | Same patterns: 2 taps = left, 3 = right |

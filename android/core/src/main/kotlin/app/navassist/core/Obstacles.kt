@@ -172,7 +172,8 @@ class ObstacleAnnouncer(var phrasing: Phrasing = Phrasing()) {
         }
         if (r.hints.stairsInView && t - stairsInViewSaidAt >= 15 && t - stairsSaidAt >= 6) {
             stairsInViewSaidAt = t
-            return listOf(GuidanceEvent.Haptic(HapticCue.OBSTACLE), GuidanceEvent.Speak("Stairs may be ahead. Slow down.", false))
+            val msg = r.hints.stairsAhead?.let { "Stairs ahead, ${phrasing.distance(it)}. Slow down." } ?: "Stairs may be ahead. Slow down."
+            return listOf(GuidanceEvent.Haptic(HapticCue.OBSTACLE), GuidanceEvent.Speak(msg, false))
         }
         if (r.immediateStop) {
             if (t - stopSaidAt >= 2) {
@@ -238,6 +239,7 @@ class ObstacleAnnouncer(var phrasing: Phrasing = Phrasing()) {
         if (c) {
             val door = lastHints.doorAhead
             if (door != null && abs(door - (meters[1] ?: door)) < 0.8) {
+                lastHints.handleSide?.let { return "Door ahead, ${phrasing.distance(door)}. Handle on the ${it.name.lowercase()}." }
                 return "Door ahead, ${phrasing.distance(door)}. Reach forward for the handle."
             }
             var ahead = "Obstacle ahead"
