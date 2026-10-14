@@ -4,8 +4,8 @@
 
 | Part | Status |
 |---|---|
-| **Navigation logic** (`android/core`) | ✅ Ported to Kotlin: route graph, A*, guidance, stairs on routes, voice commands, place matching, sign filter, obstacle zones, stair and door hints, door / stairs detector interpretation, relative→metric depth fit, behaviour predictor, trip logs (same CSV as iOS). **79 tests pass**, and they run in CI. |
-| **Android app** (`android/app`) | ⏳ Not started. It needs the Android SDK, and testing it needs an ARCore-capable phone. |
+| **Navigation logic** (`android/core`) | Done: ported to Kotlin: route graph, A*, guidance, stairs on routes, voice commands, place matching, sign filter, obstacle zones, stair and door hints, door / stairs detector interpretation, relative→metric depth fit, behaviour predictor, trip logs (same CSV as iOS). **79 tests pass**, and they run in CI. |
+| **Android app** (`android/app`) | Not started. It needs the Android SDK, and testing it needs an ARCore-capable phone. |
 
 The core is plain Kotlin on the JVM, with no Android dependency. It builds and tests with
 nothing but a JDK:
